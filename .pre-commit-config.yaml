@@ -1,0 +1,43 @@
+# Pre-commit configuratie voor iso-audit.
+#
+# Belangrijke design-keuze: alle hooks gebruiken --check / read-only varianten.
+# We voeren NOOIT format-on-write of fix-on-write hooks uit. Reden: anders gaan
+# CI en lokaal stil uit elkaar lopen — een ontwikkelaar commit, hook fixt
+# stilletjes, push, en CI faalt op iets anders dan wat de auteur zag. Beter:
+# expliciet `uv run ruff format` of `ruff check --fix` lokaal draaien wanneer
+# de hook faalt. Hook is poortwachter, niet auto-correct.
+#
+# Gitleaks is een Go-binary, geen Python-package — daarom via pre-commit
+# repository en niet via pyproject.toml.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+        name: ruff check
+        args: [--no-fix]
+      - id: ruff-format
+        name: ruff format --check
+        args: [--check]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.0.0
+    hooks:
+      - id: mypy
+        name: mypy --strict
+        files: ^src/
+        args: [--strict]
+        additional_dependencies: []
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.6
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml, -r, src]
+        additional_dependencies: ["bandit[toml]"]

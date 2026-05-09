@@ -1,0 +1,95 @@
+"""Gedeelde fixtures voor contract-tests.
+
+Doel: één fixture-set die door zowel Source- als Notifier-contract-tests wordt
+geconsumeerd. Adapters worden parametrized getest tegen deze fixtures, zodat
+elke nieuwe adapter automatisch dezelfde invarianten krijgt te valideren als
+de eerste.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+import pytest
+
+from iso_audit.modes.base import Decision
+from iso_audit.sources.base import Document, Finding
+
+
+@pytest.fixture
+def sample_document() -> Document:
+    """Een geldig Document-instance voor adapter-conformance tests."""
+    return Document(
+        id="fixture-doc-1",
+        titel="Beleid Informatiebeveiliging",
+        bron="fixture",
+        type="beleid",
+        laatst_gewijzigd="2026-04-01T00:00:00Z",
+        inhoud_uri="fixture://doc-1",
+    )
+
+
+@pytest.fixture
+def sample_documents() -> list[Document]:
+    """Een kleine set documenten voor list-iteration tests."""
+    return [
+        Document(
+            id="fixture-doc-1",
+            titel="Beleid Informatiebeveiliging",
+            bron="fixture",
+            type="beleid",
+            laatst_gewijzigd="2026-04-01T00:00:00Z",
+            inhoud_uri="fixture://doc-1",
+        ),
+        Document(
+            id="fixture-doc-2",
+            titel="Procedure Toegangsbeheer",
+            bron="fixture",
+            type="procedure",
+            laatst_gewijzigd="2026-03-15T00:00:00Z",
+            inhoud_uri="fixture://doc-2",
+        ),
+    ]
+
+
+@pytest.fixture
+def sample_finding() -> Finding:
+    """Een geldig Finding-instance."""
+    return Finding(
+        id="fixture-finding-1",
+        bron="fixture",
+        clausule_ids=["5.1", "8.16"],
+        omschrijving="Voorbeeld-bevinding voor contract-tests",
+        bewijs_uris=["fixture://doc-1"],
+    )
+
+
+@pytest.fixture
+def sample_decision() -> Decision:
+    """Een geldig Decision-instance voor Notifier-contract-tests."""
+    return Decision(
+        punt="classify_finding",
+        context={"document_id": "fixture-doc-1", "norm": "27001"},
+        voorstel={"klasse": "OFI", "clausule": "8.16"},
+        risico="midden",
+        audit_id="fixture-audit-2026-q1",
+    )
+
+
+@pytest.fixture
+def lege_registries() -> Iterator[None]:
+    """Reset alle protocol-registries vóór en ná elke test die deze fixture gebruikt.
+
+    Voorkomt dat tests elkaar besmetten via globale registry-state.
+    """
+    from iso_audit.notifiers import _reset_for_tests as _reset_notifiers
+    from iso_audit.sinks import _reset_for_tests as _reset_sinks
+    from iso_audit.sources import _reset_for_tests as _reset_sources
+
+    _reset_sources()
+    _reset_sinks()
+    _reset_notifiers()
+    yield
+    _reset_sources()
+    _reset_sinks()
+    _reset_notifiers()

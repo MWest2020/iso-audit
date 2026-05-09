@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Per .github/CONTRIBUTING.md: hooks faken niet, CI is de waarheid.
+# Vijf parallelle jobs zodat een snelle fix-en-retry-cycle direct zichtbaar is
+# welke poort gefaald is.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ruff check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      - run: uv run ruff check .
+
+  format:
+    name: ruff format --check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      - run: uv run ruff format --check .
+
+  typecheck:
+    name: mypy --strict
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      - run: uv run mypy --strict src
+
+  security:
+    name: bandit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      - run: uv run bandit -r src
+
+  test:
+    name: pytest --cov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      # Coverage-gate is 60% in milestone A — zonder geïmplementeerde adapters is
+      # hoger niveau triviaal of misleidend. Definitieve gate na baseline-meting in
+      # milestone B; per project_audit_volgende_stappen.md plafond op 85%.
+      - run: uv run pytest --cov --cov-fail-under=60

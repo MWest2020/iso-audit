@@ -1,0 +1,100 @@
+[project]
+name = "iso-audit"
+version = "0.1.0a0"
+description = "ISO 9001 + 27001 audit pipeline with pluggable source-adapters and human-in-the-loop modes"
+readme = "README.md"
+authors = [
+    { name = "Mark Westerweel", email = "mwesterweel@hotmail.com" },
+]
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+keywords = ["iso", "audit", "iso27001", "iso9001", "compliance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Information Technology",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+    "Topic :: Security",
+]
+dependencies = []
+
+[project.scripts]
+iso-audit = "iso_audit.cli:main"
+
+[project.urls]
+Repository = "https://github.com/MWest2020/iso-audit"
+
+[build-system]
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
+
+# --- Tooling ---
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: isort, N: pep8-naming, UP: pyupgrade,
+# B: bugbear, SIM: simplify, RUF: ruff-specific.
+select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["E501"]  # tests mogen lange assertion-strings hebben
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "contract: contract-tests die alle geregistreerde adapters van een protocol valideren",
+    "snapshot: snapshot-tests met fixture-data; byte-identiek match vereist",
+]
+
+[tool.coverage.run]
+source = ["iso_audit"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+
+[tool.bandit]
+# Skip B101 (assert) — pytest gebruikt assert
+exclude_dirs = ["tests"]
+skips = ["B101"]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "mypy>=2.0.0",
+    "pre-commit>=4.6.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.12",
+]
