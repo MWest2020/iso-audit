@@ -18,7 +18,10 @@ classifiers = [
     "Topic :: Office/Business",
     "Topic :: Security",
 ]
-dependencies = []
+dependencies = [
+    "anthropic>=0.102.0",
+    "python-dotenv>=1.2.2",
+]
 
 [project.scripts]
 iso-audit = "iso_audit.cli:main"
