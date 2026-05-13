@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
+import subprocess  # nosec B404 — gws CLI uitvoeren is de bedoelde flow
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -94,7 +94,10 @@ def stuur_calendar_uitnodiging(
     for deelnemer in deelnemers:
         cmd += ["--attendee", deelnemer]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    # `cmd` is een vaste lijst die met module-geconfigureerde gws-CLI begint en
+    # waarden uit env/args bevat — geen shell-injectie mogelijk. Auditor heeft
+    # bovendien expliciet bevestigd (zie _bevestig hierboven).
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # nosec B603 B607
     event: dict[str, Any] = json.loads(result.stdout)
     event_id: str = event.get("id", "")
     logger.info("Calendar-uitnodiging aangemaakt: %s", event_id)
@@ -149,7 +152,8 @@ def stuur_gmail_notificatie(
     )
 
     for ontvanger in ontvangers:
-        subprocess.run(
+        # Idem als calendar-call: vaste arglist, gws-CLI, auditor-bevestigd.
+        subprocess.run(  # nosec B603 B607
             [
                 "gws",
                 "gmail",
