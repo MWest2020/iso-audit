@@ -76,9 +76,23 @@ def test_fixture_selection_criteria() -> None:
     assert herkomst_counts["Miro"] >= 2, f"<2 miro: {herkomst_counts}"
 
 
+def _has_findings_classifier() -> bool:
+    """Returnt True als `iso_audit.classification.findings` importable is.
+
+    Wrapt `find_spec` in een try/except: als de parent-package
+    (`iso_audit.classification`) nog niet bestaat, raised find_spec
+    `ModuleNotFoundError` i.p.v. None terug te geven — dus de naive
+    `find_spec(...) is None`-check faalt bij collection.
+    """
+    try:
+        return importlib.util.find_spec("iso_audit.classification.findings") is not None
+    except ModuleNotFoundError:
+        return False
+
+
 @pytest.mark.snapshot
 @pytest.mark.skipif(
-    importlib.util.find_spec("iso_audit.classification.findings") is None,
+    not _has_findings_classifier(),
     reason="classifier nog niet gemigreerd (milestone B §2.2.5)",
 )
 def test_classifier_matches_snapshot() -> None:
