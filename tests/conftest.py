@@ -86,6 +86,7 @@ def lege_registries() -> Iterator[None]:
     tests die `available()`/`get()` direct gebruiken.
     """
     import importlib
+    import sys
 
     from iso_audit.notifiers import _reset_for_tests as _reset_notifiers
     from iso_audit.sinks import _reset_for_tests as _reset_sinks
@@ -99,13 +100,19 @@ def lege_registries() -> Iterator[None]:
     _reset_sinks()
     _reset_notifiers()
 
-    # Re-registreer bundled adapters door hun modules te herladen.
+    # Re-registreer bundled adapters. Als de module al in sys.modules zit,
+    # `reload()` om de @register-decorator opnieuw te triggeren. Anders
+    # `import_module()` — dat voert het module-script éénmaal uit.
+    # `reload()` na vers `import_module()` zou de decorator twee keer
+    # uitvoeren en in dubbele-registratie eindigen.
     for mod_naam in (
         "iso_audit.sources.drive",
         "iso_audit.sources.planning",
     ):
         try:
-            mod = importlib.import_module(mod_naam)
-            importlib.reload(mod)
+            if mod_naam in sys.modules:
+                importlib.reload(sys.modules[mod_naam])
+            else:
+                importlib.import_module(mod_naam)
         except ImportError:
             continue

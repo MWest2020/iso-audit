@@ -6,6 +6,41 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.7: OpenSpec changes verhuisd uit Ops_to_Biz
+
+Vier change-dirs gekopieerd uit `Ops_to_Biz/openspec/changes/` naar
+`iso-audit/openspec/changes/`:
+
+- `audit-rapport-management-taal/` — auditrapport-taal voor management
+- `gsuite-iso-audit-automation/` — GSuite-ingangen voor ISO-audit
+- `miro-kennissessie-generator/` — Miro-bord auto-generation
+- `hww-2-0/` — Handboek waar werken 2.0
+
+Deze waren in Ops_to_Biz nog `untracked` (nooit gecommit), dus geen
+`<sha>`-referentie in de commit-message — het is een schone verhuizing.
+
+### Fixed — 2026-05-14 — `lege_registries` conftest dubbele-registratie bug
+
+In `tests/conftest.py` veroorzaakte de combinatie
+`importlib.import_module() + importlib.reload()` een dubbele
+`@register`-call wanneer een Source-module voor het eerst werd
+geladen tijdens een test (`import_module` voert het script éénmaal
+uit, `reload` voert het nog eens uit). Fix: check `sys.modules` —
+`reload()` alleen als de module al geladen is, anders `import_module`.
+Maakt isolated `pytest tests/sources/test_protocol_contract.py`-runs
+groen (was: 2 teardown-errors).
+
+### Added — 2026-05-14 — Milestone B §2.8: M-B acceptatie
+
+- **§2.8.2** Pipeline-reproduceerbaarheid: geverifieerd via
+  `test_cli.py` (15 tests) + `test_pipeline.py` (21 tests) met
+  gemockte deps. Geen integratie-run uitgevoerd om bestaande
+  `output/`-artefacten van eerdere audit-runs niet te overschrijven.
+- **§2.8.3** Contract-tests Drive + Planning groen — 6 passed +
+  2 skipped (parametrized leeg-groen omdat M-A contract-stub
+  geen adapters verwachtte; in M-B is `drive` geregistreerd
+  → `test_registry_bevat_minstens_drive` is groen).
+
 ### Added — 2026-05-14 — Milestone B §2.6.3-5: classifications traceability
 
 - **`classifications`-tabel (§2.6.3).** Nieuwe additieve tabel in
