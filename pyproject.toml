@@ -18,7 +18,9 @@ classifiers = [
     "Topic :: Office/Business",
     "Topic :: Security",
 ]
-dependencies = []
+dependencies = [
+    "requests>=2.34.1",
+]
 
 [project.scripts]
 iso-audit = "iso_audit.cli:main"
@@ -97,4 +99,5 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.12",
+    "types-requests>=2.33.0.20260513",
 ]
