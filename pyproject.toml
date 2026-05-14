@@ -24,6 +24,7 @@ dependencies = [
     "google-auth>=2.52.0",
     "htmldocx>=0.0.6",
     "markdown>=3.10.2",
+    "openpyxl>=3.1.5",
     "python-docx>=1.2.0",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
@@ -78,8 +79,10 @@ warn_unused_ignores = true
 
 # google-api-python-client + google-auth: geen py.typed marker.
 # htmldocx: kleine third-party zonder stubs; conversie-boundary is one-shot.
+# openpyxl: stubs (`types-openpyxl`) bestaan maar zijn onvolledig voor de
+# Workbook/cell API; ignore op de import-boundary is praktischer.
 [[tool.mypy.overrides]]
-module = ["googleapiclient.*", "google.oauth2.*", "htmldocx"]
+module = ["googleapiclient.*", "google.oauth2.*", "htmldocx", "openpyxl.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

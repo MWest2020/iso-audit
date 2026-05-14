@@ -6,6 +6,24 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.5.1 rest: tabular_report + slide_summary + report_generation
+
+- **`reporting/tabular_report.py` (§2.5.1).** CSV/Excel-export voor
+  bevindingen + per-clausule samenvatting. `iso_audit.classification.thema`
+  als bron-of-truth voor THEMA_LIJST/`bepaal_thema` (geen duplicatie meer).
+  `openpyxl` als runtime-dep voor Excel-output. 21 tests, 87% coverage.
+- **`reporting/slide_summary.py` (§2.5.1).** Google Slides executive
+  summary (5 slides) via `iso_audit.clients.gws._gws`. 8 tests, 98% coverage.
+- **`reporting/report_generation.py` (§2.5.1).** Google Docs template-fill
+  flow: `_oordeel_zin`/`_oordeel_instructie`-helpers (strikt sjabloon
+  voorkomt LLM-hedging), management-summary via Anthropic met optionele
+  basis-document fallback (`AUDIT_BASIS_SUMMARY`). 18 tests, 84% coverage.
+- **`verify_docs.py`.** Bandit `nosec B608` markers op de twee
+  `DELETE … WHERE id IN ({placeholders})` queries — placeholders zijn
+  `?,?,…` zonder user-input, geparametriseerde executie is veilig.
+- **Mypy override.** `openpyxl.*` toegevoegd aan `ignore_missing_imports`
+  (stubs onvolledig voor Workbook/cell API).
+
 ### Added — 2026-05-13 — Milestone B start: baseline-meting + fixture-skeleton
 
 Start van milestone B met de baseline-prep-stappen 2.1.x uit

@@ -172,8 +172,11 @@ def run(
     if opruimen and niet_gevonden:
         ids = [d["id"] for d in niet_gevonden]
         placeholders = ",".join("?" * len(ids))
-        conn.execute(f"DELETE FROM clause_matches WHERE doc_id IN ({placeholders})", ids)
-        conn.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)
+        # `placeholders` is alleen `?,?,...` (geen user input).
+        sql_clause = f"DELETE FROM clause_matches WHERE doc_id IN ({placeholders})"  # nosec B608
+        sql_docs = f"DELETE FROM documents WHERE id IN ({placeholders})"  # nosec B608
+        conn.execute(sql_clause, ids)
+        conn.execute(sql_docs, ids)
         conn.commit()
         print(f"🗑️  {len(ids)} document(en) verwijderd uit DB (documents + clause_matches).")
     elif niet_gevonden:
