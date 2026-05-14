@@ -22,6 +22,9 @@ dependencies = [
     "anthropic>=0.102.0",
     "google-api-python-client>=2.196.0",
     "google-auth>=2.52.0",
+    "htmldocx>=0.0.6",
+    "markdown>=3.10.2",
+    "python-docx>=1.2.0",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
     "requests>=2.34.1",
@@ -70,12 +73,10 @@ warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 
-# google-api-python-client en google-auth shippen zonder type-stubs /
-# py.typed marker; mypy --strict eist anders import-time stubs. Negeer
-# specifiek voor deze packages — de runtime-types worden via Any opgevangen
-# in src/iso_audit/auth.py.
+# google-api-python-client + google-auth: geen py.typed marker.
+# htmldocx: kleine third-party zonder stubs; conversie-boundary is one-shot.
 [[tool.mypy.overrides]]
-module = ["googleapiclient.*", "google.oauth2.*"]
+module = ["googleapiclient.*", "google.oauth2.*", "htmldocx"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -116,6 +117,7 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.12",
+    "types-markdown>=3.10.2.20260508",
     "types-pyyaml>=6.0.12.20260510",
     "types-requests>=2.33.0.20260513",
 ]
