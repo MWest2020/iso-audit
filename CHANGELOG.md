@@ -6,6 +6,19 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.5.8 + §2.5.9: interview + ingest
+
+- **`ingest.py` (§2.5.9).** Drive + Miro inlees-orchestrator op top-level
+  van het package. `--only` valideert tegen `beschikbare_bronnen()` —
+  Source-registry-adapters (`drive`, `planning`, …) + pseudo-bron `miro`
+  (zolang er nog geen `MiroSource`-adapter is in §2.4). Imports
+  vernieuwd naar `iso_audit.*`. 13 tests, 95% coverage.
+- **`interview.py` (§2.5.8).** Interactieve clausule-doorloop. ANSI-
+  kleurkode helpers, `_vraag_bevinding` met EOF/quit-handling, gap-
+  detectie via `clause_matches`-tabel. `main()` accepteert optionele
+  `argv` voor testbaarheid. 13 tests, 68% coverage (interactieve loop
+  zelf niet integraal getest — overall gate 82% blijft groen).
+
 ### Added — 2026-05-14 — Milestone B §2.5.6: make_pptx snapshot-presentatie
 
 - **`reporting/make_pptx.py` (§2.5.6).** Verbatim-migratie van de
