@@ -55,6 +55,9 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["E501"]  # tests mogen lange assertion-strings hebben
+# classification/findings.py heeft system-prompts (multi-line strings) waar
+# regel-breken de prompt-tekst zou wijzigen. E501 specifiek voor deze file.
+"src/iso_audit/classification/findings.py" = ["E501"]
 # normteksten/ bevat letterlijke (verkorte) eisen uit ISO 9001:2015 en
 # 27001:2022 — line-breaking is artificieel en RUF001 ambiguous-glyphs
 # zoals × (multiplicatie) zijn legitiem in Nederlandse normtekst.
