@@ -11,6 +11,9 @@ Schema:
                     consumptie gepersisteerd inclusief prompt/model-versie,
                     input-hash, raw output, usage en duur. Dedup-key:
                     (audit_id, finding_id, prompt_versie, model_versie).
+  decisions       — audit-trail (§3.1.3): elk hoog-risico beslismoment
+                    (autonoom selectief; integer altijd voor hoog) plus
+                    de uiteindelijke auditor-actie. Append-only.
 
 FTS5 full-text search op documents.naam + documents.tekst voor lokaal
 zoeken zonder API-kosten.
@@ -138,6 +141,28 @@ def initialiseer(conn: sqlite3.Connection) -> None:
             ON classifications(audit_id);
         CREATE INDEX IF NOT EXISTS idx_classifications_finding
             ON classifications(finding_id);
+
+        CREATE TABLE IF NOT EXISTS decisions (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_id         TEXT NOT NULL,
+            punt             TEXT NOT NULL,    -- e.g. 'classify_finding', 'send_report'
+            context_json     TEXT NOT NULL,
+            voorstel_json    TEXT NOT NULL,
+            status           TEXT NOT NULL,    -- 'pending' | 'resolved' | 'cancelled'
+            besluit_json     TEXT,             -- definitief besluit; NULL als status=pending
+            risico           TEXT NOT NULL,    -- 'laag' | 'midden' | 'hoog'
+            classificatie_id INTEGER,          -- optionele link naar classifications.id
+            -- notifier_naam: NULL voor autonoom; 'slack'/'email'/... voor integer
+            notifier_naam    TEXT,
+            created_at       TEXT NOT NULL,
+            resolved_at      TEXT,
+            FOREIGN KEY (classificatie_id) REFERENCES classifications(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_decisions_audit_status
+            ON decisions(audit_id, status);
+        CREATE INDEX IF NOT EXISTS idx_decisions_punt_resolved
+            ON decisions(punt, resolved_at);
 
         -- FTS5 full-text search over naam + tekst
         CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts
@@ -373,3 +398,97 @@ def laad_classifications(
             (finding_id,),
         ).fetchall()
     return conn.execute("SELECT * FROM classifications ORDER BY created_at").fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Decisions (§3.1.3) — append-only audit-trail van Mode-beslissingen
+# ---------------------------------------------------------------------------
+
+
+def schrijf_decision(
+    conn: sqlite3.Connection,
+    audit_id: str,
+    punt: str,
+    context: dict[str, Any],
+    voorstel: dict[str, Any],
+    risico: str,
+    status: str,
+    besluit: dict[str, Any] | None = None,
+    notifier_naam: str | None = None,
+    classificatie_id: int | None = None,
+) -> int:
+    """Schrijf een nieuwe rij naar `decisions` en retourneer de toegekende id.
+
+    Status MOET `pending`, `resolved` of `cancelled` zijn. Bij `resolved`
+    is `resolved_at` automatisch gevuld met `now()`.
+    """
+    if status not in ("pending", "resolved", "cancelled"):
+        raise ValueError(
+            f"decisions.status moet 'pending', 'resolved' of 'cancelled' zijn — kreeg {status!r}"
+        )
+    resolved_at = now() if status in ("resolved", "cancelled") else None
+    cur = conn.execute(
+        """
+        INSERT INTO decisions
+            (audit_id, punt, context_json, voorstel_json, status, besluit_json,
+             risico, classificatie_id, notifier_naam, created_at, resolved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            audit_id,
+            punt,
+            json.dumps(context),
+            json.dumps(voorstel),
+            status,
+            json.dumps(besluit) if besluit is not None else None,
+            risico,
+            classificatie_id,
+            notifier_naam,
+            now(),
+            resolved_at,
+        ),
+    )
+    conn.commit()
+    return int(cur.lastrowid or 0)
+
+
+def resolve_decision(
+    conn: sqlite3.Connection,
+    decision_id: int,
+    besluit: dict[str, Any],
+    status: str = "resolved",
+) -> None:
+    """Update een `pending` decision-rij met definitief besluit en `resolved_at`.
+
+    Append-only-discipline: rijen met `status != "pending"` worden NOOIT
+    overschreven; de update doet niets als de rij al resolved/cancelled is.
+    """
+    if status not in ("resolved", "cancelled"):
+        raise ValueError(
+            f"resolve_decision: status moet 'resolved' of 'cancelled' zijn — kreeg {status!r}"
+        )
+    conn.execute(
+        """
+        UPDATE decisions
+        SET besluit_json = ?, status = ?, resolved_at = ?
+        WHERE id = ? AND status = 'pending'
+        """,
+        (json.dumps(besluit), status, now(), decision_id),
+    )
+    conn.commit()
+
+
+def laad_decision(conn: sqlite3.Connection, decision_id: int) -> sqlite3.Row | None:
+    """Geef één decision-rij terug op id, of `None` als niet bestaat."""
+    row: sqlite3.Row | None = conn.execute(
+        "SELECT * FROM decisions WHERE id = ?", (decision_id,)
+    ).fetchone()
+    return row
+
+
+def laad_pending_decisions(conn: sqlite3.Connection, audit_id: str) -> list[sqlite3.Row]:
+    """Alle `status='pending'` rijen voor een audit-run (voor crash-recovery)."""
+    return conn.execute(
+        "SELECT * FROM decisions WHERE audit_id = ? AND status = 'pending' ORDER BY created_at",
+        (audit_id,),
+    ).fetchall()

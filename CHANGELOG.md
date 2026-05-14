@@ -6,6 +6,33 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone C §3.1.3-6: Modes-implementatie + decisions-tabel
+
+- **`decisions`-tabel (§3.1.3).** Append-only audit-trail in `store.py`:
+  `(audit_id, punt, context_json, voorstel_json, status, besluit_json,
+  risico, classificatie_id, notifier_naam, created_at, resolved_at)`
+  met FK naar `classifications.id`. Indexen: `idx_decisions_audit_status`
+  en `idx_decisions_punt_resolved`. Status-set: `pending|resolved|cancelled`.
+- **`store.schrijf_decision()` + `resolve_decision()` + `laad_decision()` +
+  `laad_pending_decisions()`.** Helpers met append-only-guard: een
+  `resolved`/`cancelled`-rij wordt nooit overschreven; `resolve_decision`
+  doet alleen iets wanneer de huidige status `pending` is.
+- **`AutonoomMode` (§3.1.4) — `iso_audit/modes/autonoom.py`.** Selectieve
+  persistentie: laag/midden krijgen `voorstel` direct terug zonder DB-rij;
+  hoog wel een rij met `status="resolved"`, `notifier_naam=NULL`.
+  `delete_data` heeft een hard skip-uitzondering.
+- **`IntegerMode` (§3.1.5) — `iso_audit/modes/integer.py`.** Notifier via
+  DI; risico-gebaseerde escalatie + `vraag_bevestiging`-flag op laag-
+  risico + `confidence < 0.7` op midden. Bij escalatie: pending-rij
+  voor notifier-call, dan polling op `decisions.status` (commit per
+  iteratie om SQLite read-isolation te omzeilen). Timeout: 24h default.
+- **`modes/__init__.py`.** Exporteert `AutonoomMode` + `IntegerMode`
+  naast Protocol + dataclass.
+- **18 tests** in `tests/modes/test_autonoom.py` (8) + `test_integer.py`
+  (10): protocol-conformance, risico-regels, threaded resolver-mock met
+  per-thread connecties, timeout, cancelled-status. 96-100% cov.
+  Cumulatief 600 tests passed.
+
 ### Added — 2026-05-14 — Milestone B §2.7: OpenSpec changes verhuisd uit Ops_to_Biz
 
 Vier change-dirs gekopieerd uit `Ops_to_Biz/openspec/changes/` naar
