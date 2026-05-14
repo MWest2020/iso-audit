@@ -21,6 +21,7 @@ classifiers = [
 dependencies = [
     "google-api-python-client>=2.196.0",
     "google-auth>=2.52.0",
+    "pyyaml>=6.0.3",
 ]
 
 [project.scripts]
@@ -112,4 +113,5 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.12",
+    "types-pyyaml>=6.0.12.20260510",
 ]
