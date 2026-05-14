@@ -6,6 +6,25 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.6.1 + §2.6.2: CLI + --source flag
+
+- **`cli.py` herschreven (§2.6.1).** De milestone-A stub is vervangen
+  door een echte argparse-met-subparsers implementatie:
+  - ``iso-audit pipeline`` — alle bestaande `--norm/--no-review/...`-
+    flags + de nieuwe `--source`;
+  - ``iso-audit doctor``   — controleert `gws` op `PATH`, drukt env-
+    sleutels af + geregistreerde sources;
+  - ``iso-audit setup-template`` — wikkelt `_valideer_env` +
+    `run_setup_template`.
+- **`__main__.py` toegevoegd** — `python -m iso_audit` delegeert naar
+  `cli.main`.
+- **`--source` flag (§2.6.2).** Verplicht voor `pipeline`, multi-value
+  (kan meerdere keren opgegeven). Fallback: env-var
+  `ISO_AUDIT_DEFAULT_SOURCE` (komma-gescheiden) met INFO-log bij
+  gebruik. Onbekende source-naam → `SystemExit(2)` met duidelijke
+  foutmelding. Multi-value wordt deduplicate en gesorteerd.
+- 15 tests; CLI-coverage rond 90%.
+
 ### Added — 2026-05-14 — Milestone B §2.5.11 + §2.5.12: assets + config layout
 
 - **`assets/` (§2.5.11).** Drie Conduction-logo-SVG's gekopieerd uit
