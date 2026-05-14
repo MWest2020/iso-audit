@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone C §3.2: Notifiers (resolver + Slack + Email)
+
+- **`notifiers/resolver.py` (§3.2.1).** `SqliteDecisionResolver` met
+  `resolve(decision_id, action, modified_payload)`. Action-set:
+  `approve|reject|modify|abort`. Validatie van action-naam,
+  modify-payload-vereiste, decision-id-type. Append-only via
+  `store.resolve_decision`'s `WHERE status='pending'`-guard.
+- **`notifiers/slack.py` (§3.2.2).** `SlackNotifier` met webhook-pad
+  (`SLACK_WEBHOOK_URL`) of Web API (`SLACK_BOT_TOKEN +
+  SLACK_CHANNEL_ID`). Block Kit-message-payload. Healthcheck
+  rapporteert welk auth-pad actief is. `@register` voor auto-discovery.
+- **`notifiers/email.py` (§3.2.5).** `EmailNotifier` via SMTP met
+  STARTTLS-optie. Genereert vier magic-link-URLs per decision
+  (approve/reject/modify/abort). Token-opslag ligt bij het portaal
+  (§3.2.6 — nog te bouwen). `@register` voor auto-discovery.
+- **`IntegerMode._escaleer`** injecteert nu `decision_id` als
+  string in `decision.context` vóór de notifier-call, zodat de
+  notifier de correlatie-sleutel terug kan zenden.
+- **Contract-tests groen** (§3.2.9): `tests/notifiers/test_protocol_contract.py`
+  parametrizet nu over `slack` en `email` (was leeg-groen in M-A).
+  `tests/conftest.lege_registries` re-importeert ook notifier-modules.
+- **37 tests** in `tests/notifiers/{test_resolver,test_slack,test_email}.py`
+  + 4 nieuwe in contract-tests; cumulatief 634 tests passed.
+
 ### Added — 2026-05-14 — Milestone C §3.1.3-6: Modes-implementatie + decisions-tabel
 
 - **`decisions`-tabel (§3.1.3).** Append-only audit-trail in `store.py`:

@@ -80,14 +80,17 @@ class IntegerMode:
             return True
         if decision.risico == "midden":
             confidence = decision.context.get("confidence")
-            return (
-                isinstance(confidence, int | float) and confidence < _CONFIDENCE_GRENS
-            )
+            return isinstance(confidence, int | float) and confidence < _CONFIDENCE_GRENS
         # risico = "laag"
         return bool(decision.context.get("vraag_bevestiging"))
 
     def _escaleer(self, decision: Decision) -> dict[str, object]:
-        """Schrijf pending-rij, roep Notifier, wacht op auditor-respons."""
+        """Schrijf pending-rij, roep Notifier, wacht op auditor-respons.
+
+        Het toegekende DB-id wordt aan `decision.context["decision_id"]`
+        toegevoegd vóór de notifier-call zodat de notifier de correlatie-
+        sleutel kan terugzenden bij `DecisionResolver.resolve()`.
+        """
         from iso_audit.store import schrijf_decision
 
         decision_id = schrijf_decision(
@@ -100,7 +103,14 @@ class IntegerMode:
             status="pending",
             notifier_naam=self._notifier.naam,
         )
-        notifier_correlation_id = self._notifier.vraag_besluit(decision)
+        decision_voor_notifier = Decision(
+            punt=decision.punt,
+            context={**decision.context, "decision_id": str(decision_id)},
+            voorstel=decision.voorstel,
+            risico=decision.risico,
+            audit_id=decision.audit_id,
+        )
+        notifier_correlation_id = self._notifier.vraag_besluit(decision_voor_notifier)
         logger.info(
             "Decision %d geescaleerd via %s (notifier-correlatie %s)",
             decision_id,

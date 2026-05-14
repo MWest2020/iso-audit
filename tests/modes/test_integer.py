@@ -94,7 +94,13 @@ def test_midden_risico_lage_confidence_escaleert(conn: sqlite3.Connection) -> No
     _resolve_op_thread(conn, besluit={"klasse": "NC"}, na_seconden=0.05)
     out = mode.beslis(decision)
     assert out == {"klasse": "NC"}
-    notif.vraag_besluit.assert_called_once_with(decision)
+    # IntegerMode injecteert `decision_id` in context vóór de notifier-call,
+    # dus exact-match werkt niet; check oorspronkelijke velden.
+    assert notif.vraag_besluit.call_count == 1
+    actual = notif.vraag_besluit.call_args.args[0]
+    assert actual.punt == decision.punt
+    assert actual.risico == decision.risico
+    assert "decision_id" in actual.context
 
 
 # ---------- vraag_bevestiging flag op laag-risico ----------
