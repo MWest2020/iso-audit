@@ -6,6 +6,29 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.6.3-5: classifications traceability
+
+- **`classifications`-tabel (§2.6.3).** Nieuwe additieve tabel in
+  `store.py`: `(audit_id, finding_id, input_hash, prompt_versie,
+  model_versie, raw_output, usage_json, elapsed_s, created_at)`.
+  Dedup-key: `UNIQUE(audit_id, finding_id, prompt_versie,
+  model_versie)`. Indexen op `audit_id` en `finding_id`. Bestaande
+  `audit.db`-bestanden blijven werken (toevoeging is idempotent).
+- **`log_classification()` helper (§2.6.4).** Persist een LLM-call
+  vóór JSON-parsing. `prompt_versie = sha256(system)`,
+  `input_hash = sha256(system + user)`. `INSERT OR IGNORE` op
+  dedup-key zodat reruns een append-only trace blijven.
+- **Classifier wiring (§2.6.4).** `_classificeer_doc` en
+  `_classificeer_miro_batch` accepteren nu optionele `conn` +
+  `audit_id` en roepen `log_classification` aan na de LLM-call,
+  voor de JSON-parse. `_ClassifyContext` krijgt `audit_id`; default
+  via `_maak_audit_id()` (UTC-tijdstempel).
+- **`laad_classifications(conn, audit_id, finding_id)`.**
+  Query-helper met optionele filters.
+- 14 tests in `tests/store/test_classifications.py`: schema,
+  indexen, dedup-key (split op audit_id / prompt_versie /
+  model_versie), filters. Cumulatief 582 tests passed.
+
 ### Added — 2026-05-14 — Milestone B §2.6.1 + §2.6.2: CLI + --source flag
 
 - **`cli.py` herschreven (§2.6.1).** De milestone-A stub is vervangen

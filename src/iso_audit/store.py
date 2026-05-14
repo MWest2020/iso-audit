@@ -1,24 +1,30 @@
 """Lokale SQLite opslag voor audit-landschap.
 
 Schema:
-  documents      — Drive-bestanden met volledige tekst
-  miro_notes     — Miro sticky notes / tekstvakken
-  clause_matches — welke documenten matchen welke clausules
-  ingest_log     — wanneer is welke bron voor het laatst gesynchroniseerd
-  bevindingen    — geclassificeerde audit-bevindingen (NC/OFI/positief)
-  interviews     — handmatige bevindingen per clausule
+  documents       — Drive-bestanden met volledige tekst
+  miro_notes      — Miro sticky notes / tekstvakken
+  clause_matches  — welke documenten matchen welke clausules
+  ingest_log      — wanneer is welke bron voor het laatst gesynchroniseerd
+  bevindingen     — geclassificeerde audit-bevindingen (NC/OFI/positief)
+  interviews      — handmatige bevindingen per clausule
+  classifications — traceability-laag (§2.6.3): elke LLM-call wordt vóór
+                    consumptie gepersisteerd inclusief prompt/model-versie,
+                    input-hash, raw output, usage en duur. Dedup-key:
+                    (audit_id, finding_id, prompt_versie, model_versie).
 
 FTS5 full-text search op documents.naam + documents.tekst voor lokaal
 zoeken zonder API-kosten.
 
 Schema-stabiliteit: het schema is ongewijzigd t.o.v. `Ops_to_Biz/audit/store.py`
-om bestaande `audit.db`-bestanden te kunnen blijven gebruiken tijdens de
-migratie. Toevoegingen (zoals `classifications` voor capability-2 en
-`decisions` voor capability-3) komen in eigen migratie-stappen in milestone B/C.
+op de bestaande tabellen. Nieuwe tabellen (`classifications`) zijn additief
+en idempotent (`CREATE TABLE IF NOT EXISTS`); oude `audit.db`-bestanden
+blijven werken.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import sqlite3
@@ -113,6 +119,25 @@ def initialiseer(conn: sqlite3.Connection) -> None:
             interviewed_at TEXT NOT NULL,
             PRIMARY KEY (clausule_id, norm)
         );
+
+        CREATE TABLE IF NOT EXISTS classifications (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_id        TEXT NOT NULL,    -- run-id voor groepering
+            finding_id      TEXT NOT NULL,    -- 'drive:<doc>:<clausule>' of 'miro:<batch>'
+            input_hash      TEXT NOT NULL,    -- sha256(system + user)
+            prompt_versie   TEXT NOT NULL,    -- sha256(system) — prompt-logic-versie
+            model_versie    TEXT NOT NULL,    -- bv. claude-haiku-4-5-20251001
+            raw_output      TEXT,             -- response.content[0].text
+            usage_json      TEXT,             -- {input_tokens, output_tokens, cache_*}
+            elapsed_s       REAL,
+            created_at      TEXT NOT NULL,
+            UNIQUE(audit_id, finding_id, prompt_versie, model_versie)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_classifications_audit
+            ON classifications(audit_id);
+        CREATE INDEX IF NOT EXISTS idx_classifications_finding
+            ON classifications(finding_id);
 
         -- FTS5 full-text search over naam + tekst
         CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts
@@ -276,3 +301,75 @@ def laad_interviews(conn: sqlite3.Connection, norm: str | None = None) -> list[s
 def now() -> str:
     """UTC-tijdstempel als ISO 8601-string (voor `*_at`-kolommen)."""
     return datetime.now(UTC).isoformat()
+
+
+def _sha256(tekst: str) -> str:
+    """Hex-digest van sha256 over `tekst`."""
+    return hashlib.sha256(tekst.encode("utf-8")).hexdigest()
+
+
+def log_classification(
+    conn: sqlite3.Connection,
+    audit_id: str,
+    finding_id: str,
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    raw_output: str | None,
+    usage: dict[str, Any] | None = None,
+    elapsed_s: float | None = None,
+) -> None:
+    """Persisteer een LLM-call vóór consumptie van de output (§2.6.4).
+
+    Dedup-key: `(audit_id, finding_id, prompt_versie, model_versie)`.
+    Reruns met dezelfde prompt-versie + model overschrijven niet — de
+    classificatie blijft een append-only trace.
+
+    De `system_prompt` bepaalt `prompt_versie` (sha256); de combinatie
+    van `system_prompt + user_prompt` bepaalt `input_hash`.
+    """
+    prompt_versie = _sha256(system_prompt)
+    input_hash = _sha256(system_prompt + "\n---\n" + user_prompt)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO classifications
+            (audit_id, finding_id, input_hash, prompt_versie, model_versie,
+             raw_output, usage_json, elapsed_s, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            audit_id,
+            finding_id,
+            input_hash,
+            prompt_versie,
+            model,
+            raw_output,
+            json.dumps(usage) if usage is not None else None,
+            elapsed_s,
+            now(),
+        ),
+    )
+
+
+def laad_classifications(
+    conn: sqlite3.Connection,
+    audit_id: str | None = None,
+    finding_id: str | None = None,
+) -> list[sqlite3.Row]:
+    """Laad classifications-rijen, optioneel gefilterd op audit/finding."""
+    if audit_id and finding_id:
+        return conn.execute(
+            "SELECT * FROM classifications WHERE audit_id=? AND finding_id=? ORDER BY created_at",
+            (audit_id, finding_id),
+        ).fetchall()
+    if audit_id:
+        return conn.execute(
+            "SELECT * FROM classifications WHERE audit_id=? ORDER BY created_at",
+            (audit_id,),
+        ).fetchall()
+    if finding_id:
+        return conn.execute(
+            "SELECT * FROM classifications WHERE finding_id=? ORDER BY created_at",
+            (finding_id,),
+        ).fetchall()
+    return conn.execute("SELECT * FROM classifications ORDER BY created_at").fetchall()

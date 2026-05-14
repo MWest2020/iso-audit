@@ -36,6 +36,7 @@ import sqlite3
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 import anthropic
@@ -274,8 +275,14 @@ def _classificeer_doc(
     client: anthropic.Anthropic,
     teller: Kostenteller,
     scherpte: float = 1.0,
+    conn: sqlite3.Connection | None = None,
+    audit_id: str = "",
 ) -> list[dict[str, Any]]:
-    """Eén API-call per doc (alle opgegeven clausules in één response)."""
+    """Eén API-call per doc (alle opgegeven clausules in één response).
+
+    Als `conn` + `audit_id` zijn meegegeven, wordt de classificatie vóór
+    JSON-parsing gepersisteerd in `classifications` (§2.6.4).
+    """
     system = _systeem_voor(scherpte, herkomst="Drive")
     user = _bouw_doc_user_prompt(doc, clausule_ids, clausules)
     t0 = time.time()
@@ -290,9 +297,29 @@ def _classificeer_doc(
         teller.fouten += 1
         logger.warning("API-fout (doc %s): %s", doc.get("naam", "")[:40], e)
         return []
-    teller.voeg_toe(resp.usage, time.time() - t0)
+    elapsed = time.time() - t0
+    teller.voeg_toe(resp.usage, elapsed)
+    raw = ""
     try:
-        return _parse_json_list(resp.content[0].text)  # type: ignore[union-attr]
+        raw = resp.content[0].text  # type: ignore[union-attr]
+    except (AttributeError, IndexError):
+        raw = ""
+    if conn is not None and audit_id:
+        from iso_audit.store import log_classification
+
+        log_classification(
+            conn,
+            audit_id=audit_id,
+            finding_id=f"drive:{doc['id']}:{','.join(sorted(clausule_ids))}",
+            system_prompt=system,
+            user_prompt=user,
+            model=teller.model,
+            raw_output=raw,
+            usage=_usage_dict(resp.usage),
+            elapsed_s=elapsed,
+        )
+    try:
+        return _parse_json_list(raw)
     except (json.JSONDecodeError, IndexError) as e:
         teller.fouten += 1
         logger.warning("JSON-parse fout (doc %s): %s", doc.get("naam", "")[:40], e)
@@ -304,8 +331,14 @@ def _classificeer_miro_batch(
     clausules: dict[str, Any],
     client: anthropic.Anthropic,
     teller: Kostenteller,
+    conn: sqlite3.Connection | None = None,
+    audit_id: str = "",
 ) -> list[dict[str, Any]]:
-    """Eén API-call per Miro-batch (default 20 items)."""
+    """Eén API-call per Miro-batch (default 20 items).
+
+    Als `conn` + `audit_id` zijn meegegeven, wordt de classificatie vóór
+    JSON-parsing gepersisteerd in `classifications` (§2.6.4).
+    """
     system = _systeem_voor(scherpte=1.0, herkomst="Miro")
     user = _bouw_miro_user_prompt(notities, clausules)
     t0 = time.time()
@@ -320,13 +353,46 @@ def _classificeer_miro_batch(
         teller.fouten += 1
         logger.warning("API-fout (Miro batch): %s", e)
         return []
-    teller.voeg_toe(resp.usage, time.time() - t0)
+    elapsed = time.time() - t0
+    teller.voeg_toe(resp.usage, elapsed)
+    raw = ""
     try:
-        return _parse_json_list(resp.content[0].text)  # type: ignore[union-attr]
+        raw = resp.content[0].text  # type: ignore[union-attr]
+    except (AttributeError, IndexError):
+        raw = ""
+    if conn is not None and audit_id:
+        from iso_audit.store import log_classification
+
+        ids = ",".join(sorted(n.get("miro_item_id", n.get("id", "")) for n in notities))
+        log_classification(
+            conn,
+            audit_id=audit_id,
+            finding_id=f"miro:{ids}",
+            system_prompt=system,
+            user_prompt=user,
+            model=teller.model,
+            raw_output=raw,
+            usage=_usage_dict(resp.usage),
+            elapsed_s=elapsed,
+        )
+    try:
+        return _parse_json_list(raw)
     except (json.JSONDecodeError, IndexError) as e:
         teller.fouten += 1
         logger.warning("JSON-parse fout (Miro batch): %s", e)
         return []
+
+
+def _usage_dict(usage: Any) -> dict[str, Any]:
+    """Converteer Anthropic-usage-object naar JSON-serialiseerbare dict."""
+    if usage is None:
+        return {}
+    return {
+        "input_tokens": getattr(usage, "input_tokens", 0),
+        "output_tokens": getattr(usage, "output_tokens", 0),
+        "cache_creation_input_tokens": getattr(usage, "cache_creation_input_tokens", 0),
+        "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -520,8 +586,14 @@ class _ClassifyContext:
     norm: str
     scherpte: float
     rehash: bool
+    audit_id: str = ""
     gedaan: dict[str, set[str]] = field(default_factory=dict)
     gedaan_miro_ids: set[str] = field(default_factory=set)
+
+
+def _maak_audit_id() -> str:
+    """Genereer een run-scoped audit_id (UTC-tijdstempel)."""
+    return f"audit-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
 
 
 def classificeer_alle_bevindingen(
@@ -532,8 +604,12 @@ def classificeer_alle_bevindingen(
     scherpte: float = 1.0,
     rehash: bool = False,
     model: str | None = None,
+    audit_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Classificeer Drive-docs en Miro-notities; UPSERT in `bevindingen`-tabel.
+
+    `audit_id` groepeert de classifications-rows van deze run. Default: een
+    UTC-tijdstempel.
 
     Returnt alle bevindingen voor de norm uit de DB (incl. eerdere runs)
     voor downstream-rapportage.
@@ -552,6 +628,7 @@ def classificeer_alle_bevindingen(
         norm=norm,
         scherpte=scherpte,
         rehash=rehash,
+        audit_id=audit_id or _maak_audit_id(),
         gedaan=_gedaan_per_doc(conn, norm),
         gedaan_miro_ids=_gedaan_miro(conn, norm),
     )
@@ -624,7 +701,14 @@ def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
         doc = doc_map[doc_id]
         logger.info("[%d/%d] %s (%d clausules)", i, len(todo_pairs), doc["naam"][:50], len(cids))
         resultaten = _classificeer_doc(
-            doc, cids, ctx.clausules, ctx.client, ctx.teller, scherpte=ctx.scherpte
+            doc,
+            cids,
+            ctx.clausules,
+            ctx.client,
+            ctx.teller,
+            scherpte=ctx.scherpte,
+            conn=ctx.conn,
+            audit_id=ctx.audit_id,
         )
         res_map = {r["clausule"]: r for r in resultaten}
         bevs = [
@@ -655,7 +739,14 @@ def _classify_miro(ctx: _ClassifyContext, miro_notities: list[dict[str, Any]]) -
     for i in range(0, len(todo_miro), MIRO_BATCH):
         batch = todo_miro[i : i + MIRO_BATCH]
         logger.info("Miro batch %d (%d items)", i // MIRO_BATCH + 1, len(batch))
-        resultaten = _classificeer_miro_batch(batch, ctx.clausules, ctx.client, ctx.teller)
+        resultaten = _classificeer_miro_batch(
+            batch,
+            ctx.clausules,
+            ctx.client,
+            ctx.teller,
+            conn=ctx.conn,
+            audit_id=ctx.audit_id,
+        )
         res_map = {r["id"]: r for r in resultaten}
         bevs: list[dict[str, Any]] = []
         skip_teller = 0
