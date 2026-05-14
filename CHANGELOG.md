@@ -6,6 +6,19 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.5.11 + §2.5.12: assets + config layout
+
+- **`assets/` (§2.5.11).** Drie Conduction-logo-SVG's gekopieerd uit
+  `Ops_to_Biz/audit/assets/`. `__init__.py` toegevoegd zodat
+  `importlib.resources.files("iso_audit.assets")` werkt. Wheel-build
+  bevestigd: SVGs zitten in `iso_audit/assets/*.svg`.
+- **§2.5.12 layout-aanpassing.** Het oude `audit/config/` is in deze
+  refactor opgesplitst: clause-maps onder `data/clause_maps/`
+  (§2.2.4), normteksten als Python-modules onder `data/normteksten/`
+  (§2.2.3), report-template-yaml onder `data/` (§2.5.3). De
+  `service_account.json` is bewust niet gemigreerd — credentials
+  horen per-environment in `.env`, niet gebundeld in een Python-pakket.
+
 ### Added — 2026-05-14 — Milestone B §2.5.10: pipeline orchestrator
 
 - **`pipeline.py` (§2.5.10).** Top-level orchestrator gemigreerd uit
