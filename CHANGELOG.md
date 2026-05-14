@@ -6,6 +6,20 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.5.10: pipeline orchestrator
+
+- **`pipeline.py` (§2.5.10).** Top-level orchestrator gemigreerd uit
+  `Ops_to_Biz/audit/pipeline.py`. Imports verwezen naar `iso_audit.*`;
+  `subprocess.run` voor `gws auth status` met bandit-nosec markers;
+  HTML/DOCX/PDF-conversie als private helper `_converteer_md_naar_html_docx_pdf`
+  (was inline duplicatie); type-hints aangevuld; `main()` accepteert
+  optionele `argv` voor tests; specifieke `OSError`-vangst voor Miro
+  in plaats van blanket `EnvironmentError`.
+- **CLI-routes geverifieerd via tests**: `--local-only`, `--setup-template`,
+  `--report-only`, `--no-review`, `--dry-run-cost` → correcte dispatch.
+- 21 tests; overall coverage 79% (run_audit/run_report_only-bodies
+  niet integraal getest — orchestratie met veel externe afhankelijkheden).
+
 ### Added — 2026-05-14 — Milestone B §2.5.8 + §2.5.9: interview + ingest
 
 - **`ingest.py` (§2.5.9).** Drive + Miro inlees-orchestrator op top-level
