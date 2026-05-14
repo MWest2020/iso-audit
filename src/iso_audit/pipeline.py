@@ -32,14 +32,80 @@ import os
 import shutil
 import subprocess  # nosec B404 — gws CLI is een gecontroleerde shell-laag
 import sys
-from datetime import date, timedelta
-from typing import Any
+from datetime import UTC, date, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from iso_audit.modes.base import Mode
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _maak_audit_id() -> str:
+    """UTC-tijdstempel-gebaseerde run-id voor `decisions`/`classifications`."""
+    return f"audit-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+
+
+def _emit_decision(
+    mode: Mode | None,
+    punt: str,
+    voorstel: dict[str, Any],
+    risico: str = "laag",
+    context: dict[str, Any] | None = None,
+    audit_id: str = "",
+) -> dict[str, Any]:
+    """Stuur een Decision naar de actieve Mode en retourneer het besluit.
+
+    Als `mode` `None` is (legacy-pad, M-B-tijdperk), wordt het voorstel
+    direct geretourneerd zonder DB-rij — equivalent aan AutonoomMode-
+    laag/midden-gedrag.
+    """
+    if mode is None:
+        return dict(voorstel)
+    from iso_audit.modes.base import Decision
+
+    decision = Decision(
+        punt=punt,
+        context=context or {},
+        voorstel=voorstel,
+        risico=risico,  # type: ignore[arg-type]
+        audit_id=audit_id,
+    )
+    besluit = mode.beslis(decision)
+    return dict(besluit)
+
+
+def _resume_pending_decisions(audit_id: str, mode: Mode | None) -> None:
+    """§3.1.8 — bij start: poll bestaande pending decisions tot resolved.
+
+    Bij een crash kan een rij in `decisions` met `status='pending'`
+    achterblijven. De pipeline-restart MOET die hervatten in plaats van
+    opnieuw escaleren. Dit is een minimale implementatie: log de pending
+    rijen zodat de operator weet dat ze bestaan. Volledige hervatting
+    (resume polling op specifieke decision_id) komt mee met de
+    pipeline-`audit_id`-persistentie in §3.6.
+    """
+    if mode is None:
+        return
+    from iso_audit.store import laad_pending_decisions, verbinding
+
+    conn = verbinding()
+    try:
+        rijen = laad_pending_decisions(conn, audit_id)
+    finally:
+        conn.close()
+    if rijen:
+        logger.warning(
+            "[crash-recovery] %d pending decisions gevonden voor audit %s — "
+            "controleer eerst de auditor-respons voor: %s",
+            len(rijen),
+            audit_id,
+            [r["punt"] for r in rijen],
+        )
 
 
 def _valideer_env() -> None:
@@ -214,8 +280,23 @@ def run_audit(
     thema_llm: bool = False,
     rehash: bool = False,
     dry_run_cost: bool = False,
+    mode: Mode | None = None,
+    audit_id: str | None = None,
+    sources: list[str] | None = None,
 ) -> None:
-    """Volledige auditpipeline uitvoeren."""
+    """Volledige auditpipeline uitvoeren.
+
+    :param mode: Actieve :class:`iso_audit.modes.base.Mode`-instantie.
+        Bij `None` (legacy pad) wordt elk Decision-voorstel direct
+        geaccepteerd — equivalent aan AutonoomMode zonder DB-persistentie.
+    :param audit_id: Run-scope identifier voor `decisions`/`classifications`.
+        Bij `None` wordt er een gegenereerd.
+    :param sources: De `--source`-lijst van de CLI; alleen gebruikt voor
+        de `ingest_scope`-Decision-context (auditor kan zien welke
+        bronnen actief zijn).
+    """
+    audit_id = audit_id or _maak_audit_id()
+    _resume_pending_decisions(audit_id, mode)
     from iso_audit.classification.clause_mapping import (
         filter_clause_map,
         koppel_documenten,
@@ -261,6 +342,20 @@ def run_audit(
         logger.info("Hoofdstuk-filter actief: alleen clausule %s.*", chapter)
 
     logger.info("Stap 2/7: Drive-documenten inlezen...")
+    _emit_decision(
+        mode,
+        punt="ingest_scope",
+        voorstel={"sources": sources or ["drive", "miro"], "norm": norm},
+        risico="laag",
+        context={
+            "sources": sources or ["drive", "miro"],
+            "norm": norm,
+            "chapter": chapter,
+            # Auditor kan bij integer-modus expliciet om bevestiging vragen:
+            "vraag_bevestiging": bool(os.environ.get("ISO_AUDIT_BEVESTIG_SCOPE", "")),
+        },
+        audit_id=audit_id,
+    )
     documenten, handmatige_review = haal_documenten_op()
     if handmatige_review:
         logger.warning(
@@ -408,8 +503,35 @@ def run_audit(
         logger.info("AUDIT_TEMPLATE_DOC_ID niet ingesteld — Google Docs/Slides overgeslagen.")
 
     if rapport_doc_id and slides_id:
-        stuur_calendar_uitnodiging(rapport_doc_id, slides_id, norm)
-        stuur_gmail_notificatie(rapport_doc_id, slides_id, norm, bevestigde_bevindingen)
+        send_besluit = _emit_decision(
+            mode,
+            punt="send_report",
+            voorstel={
+                "verzenden": True,
+                "rapport_doc_id": rapport_doc_id,
+                "slides_id": slides_id,
+                "norm": norm,
+                "aantal_bevindingen": len(bevestigde_bevindingen),
+            },
+            risico="hoog",
+            context={
+                "nc_count": sum(
+                    1 for b in bevestigde_bevindingen if b.get("classificatie") == "NC"
+                ),
+                "ofi_count": sum(
+                    1 for b in bevestigde_bevindingen if b.get("classificatie") == "OFI"
+                ),
+            },
+            audit_id=audit_id,
+        )
+        if send_besluit.get("verzenden", True):
+            stuur_calendar_uitnodiging(rapport_doc_id, slides_id, norm)
+            stuur_gmail_notificatie(rapport_doc_id, slides_id, norm, bevestigde_bevindingen)
+        else:
+            logger.info(
+                "send_report-besluit: NIET versturen (reden: %s)",
+                send_besluit.get("reden") or send_besluit.get("actie", "auditor"),
+            )
 
     logger.info("=== Audit pipeline klaar ===")
 

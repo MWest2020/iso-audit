@@ -30,6 +30,9 @@ from iso_audit import __version__
 logger = logging.getLogger(__name__)
 
 _SOURCE_ENV_VAR = "ISO_AUDIT_DEFAULT_SOURCE"
+_MODE_ENV_VAR = "ISO_AUDIT_DEFAULT_MODE"
+_NOTIFIER_ENV_VAR = "ISO_AUDIT_DEFAULT_NOTIFIER"
+_VALID_MODES: tuple[str, ...] = ("autonoom", "integer")
 
 
 def _bekende_bronnen() -> list[str]:
@@ -37,6 +40,95 @@ def _bekende_bronnen() -> list[str]:
     from iso_audit.ingest import beschikbare_bronnen
 
     return beschikbare_bronnen()
+
+
+def _bekende_notifiers() -> list[str]:
+    """Alle geregistreerde Notifier-adapters."""
+    # Trigger imports zodat hun @register-decorator draait.
+    import iso_audit.notifiers.email
+    import iso_audit.notifiers.slack  # noqa: F401
+    from iso_audit import notifiers
+
+    return notifiers.available()
+
+
+def _resolve_mode(args_mode: str | None) -> str:
+    """Bepaal de actieve mode-naam uit CLI of `ISO_AUDIT_DEFAULT_MODE`-env."""
+    if args_mode:
+        return args_mode
+    env_val = os.environ.get(_MODE_ENV_VAR, "").strip()
+    if env_val:
+        logger.info("--mode niet opgegeven; fallback naar %s=%s", _MODE_ENV_VAR, env_val)
+        if env_val not in _VALID_MODES:
+            print(
+                f"iso-audit: onbekende mode {env_val!r} via env. Verwacht een van {_VALID_MODES}.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        return env_val
+    print(
+        f"iso-audit: missing required argument: --mode "
+        f"(opties: {_VALID_MODES}). "
+        f"Alternatief: zet env-var {_MODE_ENV_VAR}.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+
+def _resolve_notifier(args_notifier: str | None, mode_naam: str) -> str | None:
+    """Bepaal notifier-naam; vereist alleen bij `mode='integer'`."""
+    if mode_naam == "autonoom":
+        if args_notifier:
+            logger.warning("notifier ignored in autonoom mode (kreeg %r)", args_notifier)
+        return None
+
+    # mode == integer
+    if args_notifier:
+        chosen = args_notifier
+    else:
+        env_val = os.environ.get(_NOTIFIER_ENV_VAR, "").strip()
+        if not env_val:
+            print(
+                "iso-audit: missing required argument when --mode integer: "
+                f"--notifier (fallback env-var {_NOTIFIER_ENV_VAR}).",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        logger.info(
+            "--notifier niet opgegeven; fallback naar %s=%s",
+            _NOTIFIER_ENV_VAR,
+            env_val,
+        )
+        chosen = env_val
+
+    bekende = _bekende_notifiers()
+    if chosen not in bekende:
+        print(
+            f"iso-audit: onbekende notifier {chosen!r}. Beschikbaar: {bekende}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return chosen
+
+
+def _construeer_mode(mode_naam: str, notifier_naam: str | None) -> object:
+    """Bouw de juiste Mode-instantie met (voor integer) een Notifier via DI."""
+    from iso_audit.modes.autonoom import AutonoomMode
+    from iso_audit.modes.integer import IntegerMode
+    from iso_audit.store import initialiseer, verbinding
+
+    conn = verbinding()
+    initialiseer(conn)
+    if mode_naam == "autonoom":
+        return AutonoomMode(conn=conn)
+
+    # integer
+    assert notifier_naam is not None
+    from iso_audit import notifiers as notifier_registry
+
+    notifier_class = notifier_registry.get(notifier_naam)
+    notifier = notifier_class()
+    return IntegerMode(notifier=notifier, conn=conn)
 
 
 def _resolve_sources(args_sources: list[str] | None) -> list[str]:
@@ -78,7 +170,15 @@ def _run_pipeline(args: argparse.Namespace) -> int:
     from iso_audit import pipeline
 
     sources = _resolve_sources(args.source)
-    logger.info("Actieve sources: %s", sources)
+    mode_naam = _resolve_mode(args.mode)
+    notifier_naam = _resolve_notifier(args.notifier, mode_naam)
+    mode = _construeer_mode(mode_naam, notifier_naam)
+    logger.info(
+        "Actieve sources: %s | mode=%s | notifier=%s",
+        sources,
+        mode_naam,
+        notifier_naam or "-",
+    )
 
     pipeline.run_audit(
         args.norm,
@@ -89,6 +189,8 @@ def _run_pipeline(args: argparse.Namespace) -> int:
         thema_llm=args.thema_llm,
         rehash=args.rehash,
         dry_run_cost=args.dry_run_cost,
+        mode=mode,  # type: ignore[arg-type]
+        sources=sources,
     )
     return 0
 
@@ -117,6 +219,10 @@ def _run_doctor(_args: argparse.Namespace) -> int:
         "AUDIT_DRIVE_FOLDER_ID",
         "ANTHROPIC_API_KEY",
         "MIRO_BOARD_ID",
+        "SLACK_WEBHOOK_URL",
+        "SLACK_BOT_TOKEN",
+        "AUDIT_NOTIFIER_EMAIL",
+        "SMTP_HOST",
     ]
     print()
     print("Omgevingsvariabelen:")
@@ -128,6 +234,24 @@ def _run_doctor(_args: argparse.Namespace) -> int:
     print()
     bronnen = _bekende_bronnen()
     print(f"Geregistreerde sources: {bronnen}")
+
+    print()
+    notifier_namen = _bekende_notifiers()
+    print(f"Geregistreerde notifiers: {notifier_namen}")
+    for naam in notifier_namen:
+        try:
+            from iso_audit import notifiers as notifier_registry
+
+            instance = notifier_registry.get(naam)()
+            health = instance.healthcheck()
+            status = health.get("status", "?")
+            tag = "[ok]" if status == "ok" else "[fail]"
+            print(f"  {tag:<7} {naam}: {health}")
+            if status != "ok":
+                ok = False
+        except Exception as e:
+            print(f"  [fail] {naam}: {e}")
+            ok = False
 
     return 0 if ok else 1
 
@@ -141,6 +265,24 @@ def _voeg_pipeline_args_toe(parser: argparse.ArgumentParser) -> None:
         help=(
             "Source-adapter(s) om uit te lezen. Meerdere keren opgeven mag. "
             f"Fallback: env-var {_SOURCE_ENV_VAR} (komma-gescheiden)."
+        ),
+    )
+    parser.add_argument(
+        "--mode",
+        choices=_VALID_MODES,
+        default=None,
+        help=(
+            f"Runmodus. Verplicht; fallback: env-var {_MODE_ENV_VAR}. "
+            "autonoom: cron-friendly, geen mens-in-de-lus. "
+            "integer: escaleert hoog-risico beslissingen via --notifier."
+        ),
+    )
+    parser.add_argument(
+        "--notifier",
+        default=None,
+        help=(
+            "Notifier-adapter voor integer-modus (slack/email). "
+            f"Verplicht bij --mode integer; fallback: env-var {_NOTIFIER_ENV_VAR}."
         ),
     )
     parser.add_argument(

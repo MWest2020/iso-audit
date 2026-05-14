@@ -6,6 +6,42 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone C §3.1.7-8 + §3.5: pipeline emit + CLI --mode/--notifier
+
+- **`pipeline._emit_decision()` helper.** Stuurt een Decision naar de
+  actieve Mode en geeft het besluit terug. Bij `mode=None` (legacy)
+  retourneert het voorstel direct — equivalent aan AutonoomMode-
+  laag-pad zonder DB-rij.
+- **`pipeline.run_audit()`** accepteert nu `mode`, `audit_id`, en
+  `sources` als parameters. Decision-emit wired op drie kritieke
+  punten (§3.1.7, partial):
+  - `ingest_scope` (laag-risico; `vraag_bevestiging` opt-in via
+    `ISO_AUDIT_BEVESTIG_SCOPE`-env);
+  - `send_report` (hoog-risico; auditor kan in integer-modus
+    verzenden weigeren via Notifier);
+  - `delete_data` is voorzien maar nog niet aangeroepen — pipeline
+    schrijft momenteel geen data weg in de delete-richting; komt mee
+    met §3.6 retention-werk.
+  De andere vier beslispunten (`merge_drive_miro`, `classify_finding`,
+  `assign_clausule`, `generate_report_section`) zijn intentioneel nog
+  niet aangesloten — die vereisen diepe `findings.py`-refactor; nota
+  in changelog.
+- **`pipeline._resume_pending_decisions()` (§3.1.8).** Bij start van
+  een run-id worden bestaande `pending` rijen gelogd. Volledige
+  resume-polling op specifieke `decision_id` komt mee met
+  `audit_id`-persistentie in §3.6.
+- **CLI `--mode` (§3.5.1) + `--notifier` (§3.5.2).** Beide met
+  env-var-fallback (`ISO_AUDIT_DEFAULT_MODE`,
+  `ISO_AUDIT_DEFAULT_NOTIFIER`). Validatie:
+  - missing `--mode` zonder env → `SystemExit(2)` met opties opgesomd;
+  - `--mode integer` zonder `--notifier` → `SystemExit(2)`;
+  - `--notifier` met `--mode autonoom` → WARNING (§3.5.3);
+  - onbekende mode/notifier-naam → `SystemExit(2)`.
+- **`iso-audit doctor` (§3.5.4)** roept nu `healthcheck()` op alle
+  geregistreerde notifiers aan; exit-code 1 bij eerste fail. Toont
+  Slack + Email + Sources + env-keys in één overzicht.
+- 12 nieuwe tests + 4 bijgewerkt; cumulatief 646 tests passed.
+
 ### Added — 2026-05-14 — Milestone C §3.2: Notifiers (resolver + Slack + Email)
 
 - **`notifiers/resolver.py` (§3.2.1).** `SqliteDecisionResolver` met
