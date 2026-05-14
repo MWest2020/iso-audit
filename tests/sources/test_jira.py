@@ -1,0 +1,270 @@
+"""Tests voor `iso_audit.sources.jira.JiraSource` (§3.4.4)."""
+
+from __future__ import annotations
+
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from iso_audit.sources.base import Document, Source
+
+
+def _fake_response(ok: bool = True, status: int = 200, data: dict[str, Any] | None = None) -> Any:
+    m = MagicMock()
+    m.ok = ok
+    m.status_code = status
+    m.text = "" if ok else "error"
+    m.json.return_value = data or {}
+    return m
+
+
+def _issue(key: str, summary: str, labels: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "key": key,
+        "fields": {
+            "summary": summary,
+            "updated": "2026-05-01T10:00:00.000+0000",
+            "labels": labels or [],
+            "description": {"content": [{"type": "paragraph", "content": [{"text": "Body"}]}]},
+        },
+    }
+
+
+# ---------- healthcheck ----------
+
+
+def test_healthcheck_zonder_creds_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    monkeypatch.delenv("JIRA_BASE_URL", raising=False)
+    monkeypatch.delenv("JIRA_EMAIL", raising=False)
+    monkeypatch.delenv("JIRA_API_TOKEN", raising=False)
+    h = JiraSource().healthcheck()
+    assert h["status"] == "fail"
+
+
+def test_healthcheck_met_creds_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    notif = JiraSource(
+        base_url="https://co.atlassian.net",
+        email="a@b",
+        api_token="tkn",
+    )
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data={"displayName": "Mark"}),
+    ):
+        h = notif.healthcheck()
+    assert h["status"] == "ok"
+    assert h["user"] == "Mark"
+
+
+def test_healthcheck_api_fail_geeft_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    notif = JiraSource(base_url="https://x", email="a@b", api_token="t")
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(ok=False, status=401),
+    ):
+        h = notif.healthcheck()
+    assert h["status"] == "fail"
+    assert "401" in str(h["reden"])
+
+
+# ---------- list_documents ----------
+
+
+def test_list_documents_pagineert(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t", page_size=2)
+    page1 = {
+        "issues": [_issue("AUD-1", "Eerste"), _issue("AUD-2", "Tweede")],
+        "total": 3,
+    }
+    page2 = {"issues": [_issue("AUD-3", "Derde")], "total": 3}
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        side_effect=[_fake_response(data=page1), _fake_response(data=page2)],
+    ) as mock_get:
+        docs = list(src.list_documents())
+    assert [d.id for d in docs] == ["AUD-1", "AUD-2", "AUD-3"]
+    assert mock_get.call_count == 2
+
+
+def test_list_documents_geeft_document_velden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t")
+    page = {"issues": [_issue("AUD-1", "Titel A")], "total": 1}
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data=page),
+    ):
+        docs = list(src.list_documents())
+    assert docs[0].titel == "Titel A"
+    assert docs[0].bron == "jira"
+    assert docs[0].type == "issue"
+    assert docs[0].inhoud_uri.startswith("jira://")
+
+
+def test_list_documents_zonder_base_url_geeft_lege_iterator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Een Source zonder config raakt nooit de API en doet niets."""
+    from iso_audit.sources.jira import JiraSource
+
+    monkeypatch.delenv("JIRA_BASE_URL", raising=False)
+    src = JiraSource()
+    docs = list(src.list_documents())
+    assert docs == []
+
+
+def test_list_documents_filter_overschrijft_default_jql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t", default_jql="project=A")
+    page = {"issues": [], "total": 0}
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data=page),
+    ) as mock_get:
+        list(src.list_documents(filter={"jql": "labels=iso27001"}))
+    used_jql = mock_get.call_args.kwargs["params"]["jql"]
+    assert used_jql == "labels=iso27001"
+
+
+# ---------- fetch_content ----------
+
+
+def test_fetch_content_render_adf(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t")
+    issue_data = {
+        "fields": {
+            "description": {
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [{"text": "Eerste paragraaf"}],
+                    }
+                ]
+            },
+            "comment": {
+                "comments": [
+                    {
+                        "body": {
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"text": "Commentaar"}],
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        }
+    }
+    doc = Document(
+        id="AUD-1",
+        titel="t",
+        bron="jira",
+        type="issue",
+        laatst_gewijzigd="2026-05-01T10:00:00Z",
+        inhoud_uri="jira://AUD-1",
+    )
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data=issue_data),
+    ):
+        body = src.fetch_content(doc)
+    assert "Eerste paragraaf" in body
+    assert "Commentaar" in body
+
+
+# ---------- list_findings ----------
+
+
+def test_list_findings_emit_findings_met_clausule_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t")
+    monkeypatch.delenv("JIRA_FINDINGS_JQL", raising=False)
+    page = {
+        "issues": [
+            _issue("AUD-1", "Backup procedure", labels=["iso27001-5.30"]),
+            _issue("AUD-2", "Generieke vraag", labels=["compliance"]),
+        ],
+        "total": 2,
+    }
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data=page),
+    ):
+        findings = list(src.list_findings("sessie-1"))
+    assert len(findings) == 2
+    assert findings[0].clausule_ids == ["5.30"]
+    # 'compliance' wordt niet naar een clausule-id gemapt; lege lijst.
+    assert findings[1].clausule_ids == []
+    assert findings[0].id.startswith("sessie-1:")
+
+
+def test_list_findings_iso9001_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t")
+    monkeypatch.delenv("JIRA_FINDINGS_JQL", raising=False)
+    page = {
+        "issues": [_issue("AUD-9", "y", labels=["iso9001-9.1"])],
+        "total": 1,
+    }
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data=page),
+    ):
+        findings = list(src.list_findings("sessie-9"))
+    assert findings[0].clausule_ids == ["9.1"]
+
+
+# ---------- protocol + registry ----------
+
+
+def test_jira_implementeert_source_protocol() -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    assert isinstance(JiraSource(), Source)
+
+
+def test_jira_geregistreerd_in_sources() -> None:
+    import iso_audit.sources.jira  # noqa: F401
+    from iso_audit import sources
+
+    assert "jira" in sources.available()
+
+
+# ---------- HTTP-error path ----------
+
+
+def test_http_get_error_raised_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t")
+    with (
+        patch(
+            "iso_audit.sources.jira.requests.get",
+            return_value=_fake_response(ok=False, status=500),
+        ),
+        pytest.raises(OSError, match="500"),
+    ):
+        list(src.list_documents())

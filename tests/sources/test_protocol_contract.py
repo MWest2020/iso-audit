@@ -18,6 +18,12 @@ from typing import Any
 
 import pytest
 
+# Trigger imports van bundled source-adapters vóór `_registered_sources()`
+# parametrize-tijd wordt aangeroepen — anders blijven de parametrized
+# contract-tests leeg.
+import iso_audit.sources.drive
+import iso_audit.sources.jira
+import iso_audit.sources.planning  # noqa: F401
 from iso_audit import sources
 from iso_audit.sources.base import Document, Finding, Source
 

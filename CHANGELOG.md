@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone C §3.3 + §3.4: DriveSink + JiraSource
+
+- **`sinks/drive.py` (§3.3.1) — `DriveSink`.** Eerste concrete Sink-
+  implementatie. Accepteert `ReportPayload`; weigert
+  `NotificationPayload`/`MirrorPayload` met `SinkResult(succes=False)`.
+  Upload via `iso_audit.clients.gws._gws`: maakt eerst leeg Google Doc
+  in `AUDIT_DRIVE_FOLDER_ID`-folder, vult dan `inhoud_html` via
+  Docs API `batchUpdate.insertText` (minimale HTML→tekst conversie).
+  `@register` voor auto-discovery. 11 tests, 90% cov.
+- **§3.3.2 consolidatie van reporting write-paden DEFERRED.** De
+  bestaande `reporting/`-modules (`local_report`, `tabular_report`,
+  `report_generation`) blijven hun eigen write doen; volledige
+  doorgeleiding via `DriveSink.send()` komt in een eigen
+  iteratie nadat de eerste integer-run heeft gedraaid en het
+  rich-content-pad is bevestigd.
+- **`sources/jira.py` (§3.4.1-3) — `JiraSource`.** Jira Cloud REST
+  API v3 met basic-auth via env-vars (`JIRA_BASE_URL`, `JIRA_EMAIL`,
+  `JIRA_API_TOKEN`). `list_documents()` pagineert via `startAt`;
+  `fetch_content()` rendert ADF naar plain text; `list_findings()`
+  filtert op ISO/compliance-labels (override via `JIRA_FINDINGS_JQL`).
+  Labels `iso27001-<clausule>`/`iso9001-<clausule>` worden naar
+  `clausule_ids` gemapped. `@register` voor auto-discovery.
+  17 tests, 91% cov.
+- **Contract-tests** (§3.4.5): `tests/sources/test_protocol_contract.py`
+  parametrizet nu over `drive`, `planning`, `jira`. Sink-contract-
+  test `test_registry_bevat_minstens_drive` vervangt M-A's
+  `test_registry_is_empty`. `conftest.lege_registries` re-importeert
+  alle bundled adapters (incl. `jira` + `sinks.drive`).
+- 28 nieuwe tests; cumulatief **672 tests passed**, 81% overall cov.
+
 ### Added — 2026-05-14 — Milestone C §3.1.7-8 + §3.5: pipeline emit + CLI --mode/--notifier
 
 - **`pipeline._emit_decision()` helper.** Stuurt een Decision naar de

@@ -108,8 +108,10 @@ def lege_registries() -> Iterator[None]:
     for mod_naam in (
         "iso_audit.sources.drive",
         "iso_audit.sources.planning",
+        "iso_audit.sources.jira",
         "iso_audit.notifiers.slack",
         "iso_audit.notifiers.email",
+        "iso_audit.sinks.drive",
     ):
         try:
             if mod_naam in sys.modules:
