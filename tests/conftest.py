@@ -100,7 +100,10 @@ def lege_registries() -> Iterator[None]:
     _reset_notifiers()
 
     # Re-registreer bundled adapters door hun modules te herladen.
-    for mod_naam in ("iso_audit.sources.drive",):
+    for mod_naam in (
+        "iso_audit.sources.drive",
+        "iso_audit.sources.planning",
+    ):
         try:
             mod = importlib.import_module(mod_naam)
             importlib.reload(mod)

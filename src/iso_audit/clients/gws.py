@@ -169,3 +169,48 @@ def gws_download_bestand(file_id: str) -> bytes:
         "get",
         params={"fileId": file_id, "alt": "media", "supportsAllDrives": True},
     )
+
+
+# ---------------------------------------------------------------------------
+# Sheets-helpers
+# ---------------------------------------------------------------------------
+
+
+def gws_lees_sheet(spreadsheet_id: str, bereik: str | None = None) -> list[list[Any]]:
+    """Lees een bereik uit een Google Sheet via `gws sheets values get`.
+
+    `bereik=None` leest het eerste blad volledig (`A1:ZZ10000`-default).
+    Returnt een lijst rijen, elk rij een lijst cellen.
+    """
+    range_param = bereik or "A1:ZZ10000"
+    data = _gws(
+        "sheets",
+        "spreadsheets",
+        "values",
+        "get",
+        params={"spreadsheetId": spreadsheet_id, "range": range_param},
+    )
+    values: list[list[Any]] = data.get("values", [])
+    return values
+
+
+def gws_lees_alle_tabs(spreadsheet_id: str) -> dict[str, list[list[Any]]]:
+    """Lees alle tabs van een spreadsheet — `{tab_naam: [[rij], ...]}`.
+
+    Tabs die op een fout uitkomen worden geskipt (gelogd, niet geraised).
+    """
+    meta = _gws(
+        "sheets",
+        "spreadsheets",
+        "get",
+        params={"spreadsheetId": spreadsheet_id},
+    )
+    tabs = [s["properties"]["title"] for s in meta.get("sheets", [])]
+    resultaat: dict[str, list[list[Any]]] = {}
+    for tab in tabs:
+        try:
+            resultaat[tab] = gws_lees_sheet(spreadsheet_id, f"'{tab}'!A1:AZ500")
+            logger.info("Tab '%s': %d rijen", tab, len(resultaat[tab]))
+        except Exception as e:
+            logger.warning("Tab '%s' overgeslagen: %s", tab, e)
+    return resultaat
