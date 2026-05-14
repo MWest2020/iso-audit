@@ -26,6 +26,7 @@ dependencies = [
     "markdown>=3.10.2",
     "openpyxl>=3.1.5",
     "python-docx>=1.2.0",
+    "python-pptx>=1.0.2",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
     "requests>=2.34.1",
@@ -63,6 +64,9 @@ ignore = []
 # 27001:2022 — line-breaking is artificieel en RUF001 ambiguous-glyphs
 # zoals × (multiplicatie) zijn legitiem in Nederlandse normtekst.
 "src/iso_audit/data/normteksten/*.py" = ["E501", "RUF001"]
+# make_pptx.py is een hardcoded MT-snapshot waarbij de presentatie-tekst
+# verbatim moet blijven — line-breaking zou de inhoud wijzigen.
+"src/iso_audit/reporting/make_pptx.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -81,9 +85,17 @@ warn_unused_ignores = true
 # htmldocx: kleine third-party zonder stubs; conversie-boundary is one-shot.
 # openpyxl: stubs (`types-openpyxl`) bestaan maar zijn onvolledig voor de
 # Workbook/cell API; ignore op de import-boundary is praktischer.
+# pptx: python-pptx 1.x heeft type-annotaties zonder py.typed; mypy ziet
+# RGBColor/Inches/Pt als untyped — niet relevant voor de snapshot-module.
 [[tool.mypy.overrides]]
-module = ["googleapiclient.*", "google.oauth2.*", "htmldocx", "openpyxl.*"]
+module = ["googleapiclient.*", "google.oauth2.*", "htmldocx", "openpyxl.*", "pptx.*"]
 ignore_missing_imports = true
+
+# `make_pptx.py` is een snapshot-module die uitsluitend python-pptx-aanroepen
+# bevat; mypy --strict's no-untyped-call slaat hier nergens op.
+[[tool.mypy.overrides]]
+module = "iso_audit.reporting.make_pptx"
+disable_error_code = ["no-untyped-call"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

@@ -6,6 +6,19 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-05-14 — Milestone B §2.5.6: make_pptx snapshot-presentatie
+
+- **`reporting/make_pptx.py` (§2.5.6).** Verbatim-migratie van de
+  hardcoded MT-snapshot-presentatie (2026-03-24); dode imports verwijderd
+  (`qn`, `etree`, `Emu`), type-hints toegevoegd voor mypy --strict.
+- `python-pptx>=1.0.2` als runtime-dep toegevoegd (transitive: pillow,
+  xlsxwriter).
+- Mypy override: `pptx.*` aan `ignore_missing_imports`; module-specifieke
+  `disable_error_code = ["no-untyped-call"]` voor `make_pptx`.
+- Ruff per-file-ignore voor `E501` op `make_pptx.py` — presentatie-tekst
+  moet verbatim blijven (line-breaks zouden de inhoud wijzigen).
+- 5 tests, 96% coverage.
+
 ### Added — 2026-05-14 — Milestone B §2.5.1 rest: tabular_report + slide_summary + report_generation
 
 - **`reporting/tabular_report.py` (§2.5.1).** CSV/Excel-export voor
