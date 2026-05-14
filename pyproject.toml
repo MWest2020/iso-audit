@@ -18,7 +18,10 @@ classifiers = [
     "Topic :: Office/Business",
     "Topic :: Security",
 ]
-dependencies = []
+dependencies = [
+    "google-api-python-client>=2.196.0",
+    "google-auth>=2.52.0",
+]
 
 [project.scripts]
 iso-audit = "iso_audit.cli:main"
@@ -62,6 +65,14 @@ files = ["src"]
 warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+
+# google-api-python-client en google-auth shippen zonder type-stubs /
+# py.typed marker; mypy --strict eist anders import-time stubs. Negeer
+# specifiek voor deze packages — de runtime-types worden via Any opgevangen
+# in src/iso_audit/auth.py.
+[[tool.mypy.overrides]]
+module = ["googleapiclient.*", "google.oauth2.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
