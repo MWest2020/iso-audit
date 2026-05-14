@@ -24,6 +24,7 @@ dependencies = [
     "google-auth>=2.52.0",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
+    "requests>=2.34.1",
 ]
 
 [project.scripts]
@@ -116,4 +117,5 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.12",
     "types-pyyaml>=6.0.12.20260510",
+    "types-requests>=2.33.0.20260513",
 ]
