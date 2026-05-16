@@ -143,7 +143,8 @@ def beschikbare_bronnen() -> list[str]:
     Trigger imports van de gebundelde adapters zodat hun ``@register``-
     decorator hen aan de Source-registry toevoegt voordat we deze opvragen.
     """
-    import iso_audit.sources.drive  # registreert DriveSource
+    import iso_audit.sources.drive  # noqa: F401  # registreert DriveSource
+    import iso_audit.sources.jira  # noqa: F401  # registreert JiraSource
     import iso_audit.sources.planning  # noqa: F401  # registreert PlanningSource
     from iso_audit import sources
 
