@@ -25,7 +25,14 @@ import os
 import shutil
 import sys
 
+from dotenv import load_dotenv
+
 from iso_audit import __version__
+
+# Laad `.env` zodat env-vars uit de project-root beschikbaar zijn voor
+# `doctor`, `pipeline`, `setup-template`. `pipeline.py` laadt ze ook bij
+# eigen import-time, maar `doctor` raakt `pipeline` niet aan — daarom hier.
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
