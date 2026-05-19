@@ -59,15 +59,45 @@ NIET_TEKSTUEEL: frozenset[str] = frozenset(
 FOLDER_ENV_VARS: tuple[str, ...] = ("AUDIT_SOURCE_FOLDER_ID", "AUDIT_DRIVE_FOLDER_ID")
 
 
-def _resolve_folder_id(expliciet: str | None = None) -> str:
-    """Bepaal de Drive-folder-ID; raise als geen bron beschikbaar."""
+def _split_ids(raw: str) -> list[str]:
+    """Splits een komma-gescheiden string in losse, gestripte folder-ids."""
+    return [v.split("?")[0].strip() for v in raw.split(",") if v.strip()]
+
+
+def _resolve_folder_ids(expliciet: str | list[str] | None = None) -> list[str]:
+    """Bepaal de Drive-folder-IDs (één of meer); raise als geen bron beschikbaar.
+
+    Bronvolgorde:
+
+    1. `expliciet` argument (string met komma-sep of list[str]).
+    2. `AUDIT_SOURCE_FOLDER_ID` env (komma-sep) — primair voor multi-folder.
+    3. `AUDIT_DRIVE_FOLDER_ID` env (komma-sep) — fallback.
+    4. Beide env-vars samen: als ze allebei gezet en verschillend zijn, worden
+       de IDs uit beide samengevoegd. Zo werken historische single-folder-
+       configs én de multi-folder-praktijk waar Conduction zowel een Shared
+       Drive (`0A...`) als een losse folder gebruikt.
+    """
     if expliciet:
-        return expliciet.split("?")[0].strip()
+        if isinstance(expliciet, list):
+            return [i for v in expliciet for i in _split_ids(v)]
+        return _split_ids(expliciet)
+    accumulated: list[str] = []
     for var in FOLDER_ENV_VARS:
         v = os.environ.get(var)
         if v:
-            return v.split("?")[0].strip()
-    raise OSError(f"Geen Drive-map geconfigureerd. Stel {' of '.join(FOLDER_ENV_VARS)} in .env in.")
+            for fid in _split_ids(v):
+                if fid not in accumulated:
+                    accumulated.append(fid)
+    if not accumulated:
+        raise OSError(
+            f"Geen Drive-map geconfigureerd. Stel {' of '.join(FOLDER_ENV_VARS)} in .env in."
+        )
+    return accumulated
+
+
+def _resolve_folder_id(expliciet: str | None = None) -> str:
+    """Backwards-compat: retourneer de eerste folder-ID uit de configuratie."""
+    return _resolve_folder_ids(expliciet)[0]
 
 
 def _is_uitgesloten(naam: str) -> bool:
@@ -91,22 +121,34 @@ class DriveSource:
 
     naam = "drive"
 
-    def __init__(self, folder_id: str | None = None) -> None:
+    def __init__(self, folder_id: str | list[str] | None = None) -> None:
         """Configuratie wordt eenmalig vastgezet (immutable runtime-conf)."""
-        self._folder_id = _resolve_folder_id(folder_id)
+        self._folder_ids = _resolve_folder_ids(folder_id)
         # Shared Drive roots beginnen met "0A".
-        self._drive_id: str | None = self._folder_id if self._folder_id.startswith("0A") else None
+        self._drive_id_voor: dict[str, str | None] = {
+            fid: (fid if fid.startswith("0A") else None) for fid in self._folder_ids
+        }
 
     @property
     def folder_id(self) -> str:
-        return self._folder_id
+        """Backwards-compat: eerste folder-ID."""
+        return self._folder_ids[0]
+
+    @property
+    def folder_ids(self) -> list[str]:
+        """Volledige lijst van geconfigureerde Drive-locaties."""
+        return list(self._folder_ids)
 
     @property
     def drive_id(self) -> str | None:
-        return self._drive_id
+        """Backwards-compat: drive-id van de eerste folder."""
+        return self._drive_id_voor[self._folder_ids[0]]
 
     def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:
-        """Yield documenten uit de geconfigureerde Drive-map (recursief).
+        """Yield documenten uit alle geconfigureerde Drive-locaties (recursief).
+
+        Bij meerdere folders wordt op `file-id` gededupliceerd zodat een
+        bestand dat in twee scopes voorkomt maar één keer wordt opgeleverd.
 
         `filter` wordt momenteel genegeerd; Drive-filtering gebeurt op
         folder-niveau via env-configuratie (`AUDIT_SOURCE_FOLDER_ID`).
@@ -114,30 +156,35 @@ class DriveSource:
         """
         del filter  # toekomstige uitbreiding; nu nog niet ondersteund
         logger.info(
-            "DriveSource list_documents: folder=%s (shared_drive=%s)",
-            self._folder_id,
-            bool(self._drive_id),
+            "DriveSource list_documents: folders=%s",
+            self._folder_ids,
         )
-        for bestand in gws_lijst_bestanden(self._folder_id, drive_id=self._drive_id):
-            naam = bestand["name"]
-            mime = bestand["mimeType"]
-            if _is_uitgesloten(naam):
-                logger.debug("Uitgesloten (referentiedocument): %s", naam)
-                continue
-            if mime in NIET_TEKSTUEEL:
-                logger.info("Skip (niet-tekstueel): %s (%s)", naam, mime)
-                continue
-            if mime not in ONDERSTEUNDE_MIME_TYPES:
-                logger.debug("Skip (onbekend MIME): %s (%s)", naam, mime)
-                continue
-            yield Document(
-                id=bestand["id"],
-                titel=naam,
-                bron="drive",
-                type=ONDERSTEUNDE_MIME_TYPES[mime],
-                laatst_gewijzigd=bestand.get("modifiedTime", ""),
-                inhoud_uri=bestand["id"],
-            )
+        gezien: set[str] = set()
+        for fid in self._folder_ids:
+            for bestand in gws_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid]):
+                file_id = bestand["id"]
+                if file_id in gezien:
+                    continue
+                gezien.add(file_id)
+                naam = bestand["name"]
+                mime = bestand["mimeType"]
+                if _is_uitgesloten(naam):
+                    logger.debug("Uitgesloten (referentiedocument): %s", naam)
+                    continue
+                if mime in NIET_TEKSTUEEL:
+                    logger.info("Skip (niet-tekstueel): %s (%s)", naam, mime)
+                    continue
+                if mime not in ONDERSTEUNDE_MIME_TYPES:
+                    logger.debug("Skip (onbekend MIME): %s (%s)", naam, mime)
+                    continue
+                yield Document(
+                    id=file_id,
+                    titel=naam,
+                    bron="drive",
+                    type=ONDERSTEUNDE_MIME_TYPES[mime],
+                    laatst_gewijzigd=bestand.get("modifiedTime", ""),
+                    inhoud_uri=file_id,
+                )
 
     def fetch_content(self, doc: Document) -> str:
         """Lees de feitelijke tekst van een `Document` op uit Drive."""
@@ -157,21 +204,25 @@ class DriveSource:
         return iter([])
 
     def healthcheck(self) -> dict[str, object]:
-        """Verifieer dat de Drive-folder bereikbaar is via `gws`."""
-        try:
-            bestanden = gws_lijst_bestanden(self._folder_id, drive_id=self._drive_id)
-        except Exception as e:
-            return {
-                "status": "fail",
-                "naam": self.naam,
-                "tenant": self._folder_id,
-                "reden": f"gws-fout: {e}",
-            }
+        """Verifieer dat alle geconfigureerde Drive-locaties bereikbaar zijn."""
+        per_folder: dict[str, int] = {}
+        for fid in self._folder_ids:
+            try:
+                bestanden = gws_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid])
+            except Exception as e:
+                return {
+                    "status": "fail",
+                    "naam": self.naam,
+                    "tenant": fid,
+                    "reden": f"gws-fout op {fid}: {e}",
+                }
+            per_folder[fid] = len(bestanden)
         return {
             "status": "ok",
             "naam": self.naam,
-            "tenant": self._folder_id,
-            "aantal_bestanden": len(bestanden),
+            "folders": list(self._folder_ids),
+            "per_folder": per_folder,
+            "aantal_bestanden": sum(per_folder.values()),
         }
 
 
@@ -233,27 +284,41 @@ def _verwerk_batch(
 
 
 def haal_documenten_op(
-    folder_id: str | None = None,
+    folder_id: str | list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Legacy-API: haal documenten op + lijst van items die handmatige review nodig hebben.
 
+    Ondersteunt meerdere folders (komma-sep `AUDIT_SOURCE_FOLDER_ID` of
+    `folder_id`-lijst); deduplicatie op file-id.
+
     Voor nieuwe code: gebruik `DriveSource.list_documents()` + `fetch_content()`.
     """
-    resolved = _resolve_folder_id(folder_id)
-    drive_id = resolved if resolved.startswith("0A") else None
+    resolved_ids = _resolve_folder_ids(folder_id)
+    logger.info("Drive-ingest gestart vanuit %d locatie(s): %s", len(resolved_ids), resolved_ids)
 
-    logger.info(
-        "Drive-ingest gestart vanuit map %s (shared_drive=%s)",
-        resolved,
-        bool(drive_id),
-    )
-    alle_bestanden = gws_lijst_bestanden(resolved, drive_id=drive_id)
+    alle_bestanden: list[dict[str, Any]] = []
+    gezien_ids: set[str] = set()
+    for fid in resolved_ids:
+        drive_id = fid if fid.startswith("0A") else None
+        bestanden = gws_lijst_bestanden(fid, drive_id=drive_id)
+        for b in bestanden:
+            if b["id"] in gezien_ids:
+                continue
+            gezien_ids.add(b["id"])
+            alle_bestanden.append(b)
+        logger.info(
+            "  %s (shared_drive=%s): %d bestanden (na dedup)",
+            fid,
+            bool(drive_id),
+            len(alle_bestanden),
+        )
+
     if not alle_bestanden:
         raise RuntimeError(
-            f"Geen bestanden gevonden in Drive-map {resolved}. "
-            "Controleer de map-ID en gws-authenticatie (`gws auth login`)."
+            f"Geen bestanden gevonden in Drive-locaties {resolved_ids}. "
+            "Controleer de map-IDs en gws-authenticatie (`gws auth login`)."
         )
-    logger.info("Totaal gevonden: %d bestanden", len(alle_bestanden))
+    logger.info("Totaal uniek gevonden: %d bestanden", len(alle_bestanden))
 
     alle_documenten: list[dict[str, Any]] = []
     alle_handmatige_review: list[dict[str, Any]] = []

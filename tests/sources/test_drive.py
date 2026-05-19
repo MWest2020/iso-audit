@@ -45,6 +45,41 @@ def test_resolve_zonder_env_raised() -> None:
         drive._resolve_folder_id()
 
 
+# ---------- _resolve_folder_ids (multi-folder) ----------
+
+
+def test_resolve_ids_komma_sep_string() -> None:
+    """Komma-gescheiden string wordt naar lijst gesplitst."""
+    assert drive._resolve_folder_ids("a,b,c") == ["a", "b", "c"]
+
+
+def test_resolve_ids_lijst_argument() -> None:
+    """Lijst-argument wordt direct doorgegeven."""
+    assert drive._resolve_folder_ids(["a", "b"]) == ["a", "b"]
+
+
+def test_resolve_ids_beide_env_vars_samengevoegd(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Beide env-vars met verschillende waarden → samengevoegd, dedup, volgorde behouden."""
+    monkeypatch.setenv("AUDIT_SOURCE_FOLDER_ID", "0AAP-shared")
+    monkeypatch.setenv("AUDIT_DRIVE_FOLDER_ID", "1YJoG-folder")
+    assert drive._resolve_folder_ids() == ["0AAP-shared", "1YJoG-folder"]
+
+
+def test_resolve_ids_dedup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Dezelfde ID in beide env-vars verschijnt maar één keer."""
+    monkeypatch.setenv("AUDIT_SOURCE_FOLDER_ID", "samepath")
+    monkeypatch.setenv("AUDIT_DRIVE_FOLDER_ID", "samepath")
+    assert drive._resolve_folder_ids() == ["samepath"]
+
+
+def test_resolve_ids_komma_in_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Komma-sep binnen één env-var wordt ook gesplitst."""
+    monkeypatch.setenv("AUDIT_SOURCE_FOLDER_ID", "a, b ,c")
+    assert drive._resolve_folder_ids() == ["a", "b", "c"]
+
+
 # ---------- _is_uitgesloten ----------
 
 
@@ -155,6 +190,62 @@ def test_list_documents_lege_modifiedtime() -> None:
     assert doc.laatst_gewijzigd == ""
 
 
+# ---------- multi-folder ----------
+
+
+def test_list_documents_multi_folder_unie() -> None:
+    """Twee folders met disjoint files → union van docs."""
+    folder_a = [
+        {
+            "id": "a1",
+            "name": "A.docx",
+            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    ]
+    folder_b = [
+        {
+            "id": "b1",
+            "name": "B.docx",
+            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    ]
+    src = drive.DriveSource(folder_id=["foldA", "foldB"])
+
+    def _fake_list(fid: str, drive_id: str | None = None) -> list[dict[str, Any]]:
+        return folder_a if fid == "foldA" else folder_b
+
+    with patch.object(drive, "gws_lijst_bestanden", side_effect=_fake_list):
+        ids = {d.id for d in src.list_documents()}
+    assert ids == {"a1", "b1"}
+
+
+def test_list_documents_multi_folder_dedup_op_file_id() -> None:
+    """Hetzelfde file-id in beide folders → maar één keer in output."""
+    overlap = [
+        {
+            "id": "same-1",
+            "name": "Doc.docx",
+            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    ]
+    src = drive.DriveSource(folder_id=["foldA", "foldB"])
+    with patch.object(drive, "gws_lijst_bestanden", return_value=overlap):
+        docs = list(src.list_documents())
+    assert len(docs) == 1
+    assert docs[0].id == "same-1"
+
+
+def test_drivesource_shared_drive_detection_per_folder() -> None:
+    """`0A`-prefix wordt per folder als shared-drive-id behandeld."""
+    src = drive.DriveSource(folder_id=["0A-shared", "1-regular"])
+    # Property `folder_ids` levert beide; `folder_id`/`drive_id` retro-compat naar de eerste.
+    assert src.folder_ids == ["0A-shared", "1-regular"]
+    assert src.folder_id == "0A-shared"
+    assert src.drive_id == "0A-shared"  # eerste is shared
+    # Verifieer dat de tweede regular als folder-only is geregistreerd.
+    assert src._drive_id_voor["1-regular"] is None
+
+
 # ---------- fetch_content ----------
 
 
@@ -240,6 +331,35 @@ def test_healthcheck_fail_op_exception() -> None:
         h = src.healthcheck()
     assert h["status"] == "fail"
     assert "boom" in str(h["reden"])
+
+
+def test_healthcheck_multi_folder_aggregeert() -> None:
+    """Healthcheck telt bestanden per folder + totaal."""
+    src = drive.DriveSource(folder_id=["foldA", "foldB"])
+
+    def _fake_list(fid: str, drive_id: str | None = None) -> list[dict[str, Any]]:
+        return [{"id": f"{fid}-1"}, {"id": f"{fid}-2"}] if fid == "foldA" else [{"id": "b-1"}]
+
+    with patch.object(drive, "gws_lijst_bestanden", side_effect=_fake_list):
+        h = src.healthcheck()
+    assert h["status"] == "ok"
+    assert h["aantal_bestanden"] == 3
+    assert h["per_folder"] == {"foldA": 2, "foldB": 1}
+
+
+def test_healthcheck_multi_folder_fail_eerste_folder() -> None:
+    """Eerste falende folder → status=fail met de specifieke folder benoemd."""
+    src = drive.DriveSource(folder_id=["foldA", "foldB"])
+
+    def _fake_list(fid: str, drive_id: str | None = None) -> list[dict[str, Any]]:
+        if fid == "foldB":
+            raise RuntimeError("permission denied op foldB")
+        return [{"id": "a-1"}]
+
+    with patch.object(drive, "gws_lijst_bestanden", side_effect=_fake_list):
+        h = src.healthcheck()
+    assert h["status"] == "fail"
+    assert "foldB" in str(h["reden"])
 
 
 # ---------- Registry-registratie ----------
