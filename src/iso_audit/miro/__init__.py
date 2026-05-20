@@ -1,11 +1,12 @@
-"""Miro-API-laag voor iso-audit.
+"""Miro-API-laag voor iso-audit (READ-only).
 
-Consolideert wat in `Ops_to_Biz/audit/` verspreid over `miro_board_setup.py`,
-`miro_ingest.py` en `interview_miro.py` zat: gedeelde HTTP-laag
-(headers, retry, rate-limit) in `client.py`; bord-, ingest- en interview-
-logica in respectievelijke modules (volgen in vervolg-PRs).
+- `client.py` — gedeelde HTTP-laag (headers, retry, rate-limit).
+- `ingest.py` — `haal_notities_op` + `koppel_aan_clausules` voor het
+  uitlezen van auditor-sticky-notes naar bevindingen.
 
-Per milestone B §2.4.
+Het schrijf-pad (auto-aanmaak audit-bord, interview-bord) is per
+`miro-write-trim` verwijderd; de auditor zet het bord zelf op via
+Miro-AI of een template — zie `docs/miro-auditor-bord-prompt.md`.
 """
 
 from __future__ import annotations
