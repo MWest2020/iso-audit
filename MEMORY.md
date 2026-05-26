@@ -1,6 +1,6 @@
 # MEMORY — iso-audit handoff voor volgende sessie
 
-> Laatste update: 2026-05-20 · branch `refactor/iso-audit-milestone-b`
+> Laatste update: 2026-05-26 · branch `refactor/iso-audit-milestone-b`
 >
 > Dit document is een handoff-snapshot, geen log. Werk het bij aan het
 > einde van elke sessie met (a) waar je gebleven bent en (b) wat de
@@ -16,27 +16,21 @@
 | Milestone C §3.6 (eerste integer-run, acceptatie) | ⏳ wacht op manuele runs met Slack/Email/Jira creds |
 | Milestone C §3.7 (cleanup `Ops_to_Biz/audit/`) | ✓ klaar — Ops_to_Biz commits `2edc146` + `512c49a` |
 | Milestone C §3.8 (tag `v1.0.0`) | ⏳ na §3.6 acceptatie |
-| Open PR #9: `miro-write-trim` | ⏳ wacht op review/merge — alle gates groen |
+| PR #9: `miro-write-trim` | ✓ gemerged 2026-05-21 (`6d0c1ee`) |
 
-**Test/quality baseline op huidige branch:** 682 passed, 1 skipped,
-81% coverage, ruff/mypy --strict/bandit clean.
+**Test/quality baseline op huidige branch:** 649 passed, 1 skipped,
+85% coverage, ruff/mypy --strict/bandit clean (geverifieerd 2026-05-26).
 
-**Na merge van PR #9:** 649 passed, 85% coverage.
+## PR #9 — miro-write-trim (gemerged)
 
-## Open PR #9 — miro-write-trim
-
-Branch: `refactor/miro-write-trim` → `refactor/iso-audit-milestone-b`.
-Verwijdert `iso_audit.miro.{board_setup,interview}` + tests; behoudt
-`client` + `ingest` (READ-pijp). Vervangt write-pad door Miro-AI
-prompts in `docs/miro-auditor-bord-prompt.md` en
+Branch `refactor/miro-write-trim` → `refactor/iso-audit-milestone-b`,
+gemerged 2026-05-21. Verwijdert `iso_audit.miro.{board_setup,interview}` +
+tests; behoudt `client` + `ingest` (READ-pijp). Write-pad vervangen door
+Miro-AI prompts in `docs/miro-auditor-bord-prompt.md` en
 `docs/miro-interview-prompt.md`.
 
-**Gouden test geslaagd:** `iso-audit pipeline --source drive --norm
-9001 --mode autonoom --dry-run-cost --rehash` geeft byte-identiek
-152 docs / 73 calls / $0.3339 op trim-branch als op baseline.
-
-OpenSpec: `openspec/changes/miro-write-trim/` (proposal + design +
-tasks + spec-delta). Na merge naar archive verplaatsen.
+OpenSpec: `openspec/changes/archive/miro-write-trim/` (proposal + design +
+tasks + spec-delta).
 
 ## Volgende sessie: Jira-integratie afmaken
 
@@ -99,8 +93,10 @@ Vereist `SLACK_WEBHOOK_URL` of `SLACK_BOT_TOKEN+SLACK_CHANNEL_ID` in
 `AUDIT_NOTIFIER_EMAIL` (plus de Flask-portaal die nog niet bestaat —
 opgeschort naar eigen change-proposal, zie tasks.md §3.2.6-7).
 
-Acceptatie-checklist staat in `openspec/changes/archive/iso-refactor/
-tasks.md` §3.6.1-5.
+Acceptatie-checklist voor §3.6 stond oorspronkelijk in `openspec/changes/
+iso-refactor/tasks.md`; die change-directory bestaat niet in deze repo
+(zie issue onder "Wat NIET vergeten" — phantom-pointer in CLAUDE.md,
+README.md en ARCHITECTURE.md).
 
 ## Wat NIET vergeten
 
@@ -116,6 +112,14 @@ tasks.md` §3.6.1-5.
 - **Branch protection op `main`** is nog niet ingesteld (zie task
   §1.1.2). Mark moet dat zelf in GitHub UI doen wegens hook-
   classifier-restrictie.
+- **`openspec/changes/iso-refactor/` bestaat niet** (nergens in git-
+  historie). De pointers in README.md en ARCHITECTURE.md zijn op
+  2026-05-26 weggehaald; **CLAUDE.md (project, regel 30) heeft de
+  pointer nog** — verwijderen of vervangen door MEMORY.md zodra de
+  iso-refactor-roadmap een definitieve thuislocatie heeft.
+- **`.env` mist Jira/Slack/SMTP keys** en bevat nog Ops_to_Biz vars
+  (ArgoCD, GoogleSheets) — moet opgeschoond + aangevuld vóór de
+  volgende-sessie smoke-test kan draaien.
 
 ## Memory-bestand zelf
 

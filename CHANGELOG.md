@@ -6,6 +6,82 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-05-26 — `.gitignore` aangevuld met secret-patronen
+
+- **`.gitignore`** uitgebreid met `*.pem`, `*.key`, `*_rsa`, `*.crt`,
+  `*.p12`, `*.pfx`. Was eis vanuit workstation-policy (zie globale
+  CLAUDE.md "Secrets and Credentials"); pre-tool-use hook blokkeerde
+  de commit tot deze patronen erin stonden. Niet dat er specifieke
+  files bestonden die per ongeluk gecommit zouden worden — dit is
+  preventief.
+
+### Fixed — 2026-05-26 — Broken gitleaks-pin in pre-commit-config
+
+- **`.pre-commit-config.yaml` gitleaks rev `v8.30.6` → `v8.30.1`.** De
+  v8.30.6-tag bestaat niet in de gitleaks-repo (laatste reachable was
+  v8.30.1 op fetch-moment); pre-commit faalde tijdens init met
+  `pathspec 'v8.30.6' did not match any file(s) known to git`,
+  waardoor elke commit geblokkeerd was. v8.30.6 stond pinned vanaf de
+  initial scaffold (commit `6fba351`, M-A) — vermoedelijk een
+  typo/non-existent-rev die `pre-commit autoupdate` had geschreven.
+  Verlaging naar de eerstvolgende bestaande tag (v8.30.1) is de
+  minimale fix.
+
+### Changed — 2026-05-26 — Doc-sync: README + ARCHITECTURE post-M-C
+
+- **README.md status-banner herschreven.** Was "milestone A skeleton
+  (alpha) — pipeline/classifier/rapport komen in M-B; modes/notifiers
+  in M-C". Nu: "A + B + grootste deel C gemerged; drie sources, één
+  Sink, twee Notifiers, beide modes". Resterend werk (M-C §3.6
+  acceptatie + `v1.0.0`-tag) expliciet vermeld.
+- **README.md "stub-CLI" paragraaf** vervangen — `pipeline`, `doctor`,
+  `setup-template` zijn allemaal beschikbaar; korte beschrijving van
+  de drie verplichte flags (`--source`, `--mode`, `--notifier`).
+- **README.md roadmap-pointer** verlegd van dode link
+  `openspec/changes/iso-refactor/` naar `MEMORY.md`.
+- **ARCHITECTURE.md status-banner** zelfde behandeling; M-A/M-B/M-C
+  labels in de protocol-secties blijven staan als provenance (wanneer
+  elke module landde — nuttig voor reviewers).
+- **ARCHITECTURE.md Sink-sectie** herschreven: "Spec-only in milestone A"
+  → "`DriveSink` shipped in M-C §3.3.1; reporting write-pad consolidatie
+  DEFERRED tot na eerste integer-run".
+- **ARCHITECTURE.md Modes-sectie** herschreven: "In M-A bestaat alleen
+  Decision dataclass + Mode-stub. AutonoomMode/IntegerMode komen in M-C"
+  → "AutonoomMode en IntegerMode zijn beide gerealiseerd in M-C".
+- **ARCHITECTURE.md sectie-titel** "Pipeline-orchestratie (vooruitkijkend,
+  milestone B/C)" → "Pipeline-orchestratie" (niet meer vooruitkijkend).
+- **Drie dode links naar `openspec/changes/iso-refactor/design.md` en
+  `openspec/changes/iso-refactor/`** opgeruimd (regels 86, 131, 203 in
+  ARCHITECTURE.md). Decision-2-rationale staat al in de tekst eromheen;
+  decision 3 → vervangen door pointer naar `docs/modes.md`; "Verder
+  lezen"-pointer vervangen door `MEMORY.md`.
+- **CLAUDE.md (project-niveau, regel 30) heeft dezelfde dode pointer
+  nog staan** — bewust niet aangepast in deze sessie omdat de gevraagde
+  scope README + ARCHITECTURE was. Genoteerd in MEMORY.md "Wat NIET
+  vergeten".
+- Geen code-changes. Tests blijven 649 passed, 1 skipped.
+
+### Changed — 2026-05-26 — Housekeeping: handoff-doc sync + change archiveren
+
+- **MEMORY.md gesyncroniseerd met huidige repo-staat.** PR #9
+  (`miro-write-trim`) staat nu gemarkeerd als gemerged 2026-05-21
+  (`6d0c1ee`) i.p.v. ⏳; test-baseline-rij teruggebracht tot één
+  regel (649 passed / 85% cov, post-merge). De obsolete "Open PR #9"
+  detail-sectie vervangen door een korte gemerged-notitie.
+- **"Wat NIET vergeten" uitgebreid** met twee resterende issues
+  (de derde — README/ARCHITECTURE stale — is in dezelfde sessie
+  weggewerkt, zie de doc-sync entry hierboven): (a)
+  `openspec/changes/iso-refactor/` bestaat niet in deze repo maar
+  wordt vanuit project-CLAUDE.md (regel 30) nog als pointer gebruikt
+  — dead-link; (b) `.env` mist `JIRA_*`/`SLACK_*`/`SMTP_*` keys en
+  bevat nog Ops_to_Biz vars — opschonen vóór de smoke-test.
+- **`openspec/changes/miro-write-trim/` verplaatst naar
+  `openspec/changes/archive/`** (per CLAUDE.md OpenSpec §4 "archiveren
+  na merge"). Tasks.md afgevinkt; §5.6 (tag `v0.3.0-beta`) als
+  overgeslagen genoteerd omdat de tag-strategie nu één gebundelde
+  `v1.0.0` na M-C §3.6 mikt.
+- Geen code-changes. Tests blijven 649 passed, 1 skipped.
+
 ### Added — 2026-05-14 — Milestone C §3.3 + §3.4: DriveSink + JiraSource
 
 - **`sinks/drive.py` (§3.3.1) — `DriveSink`.** Eerste concrete Sink-
