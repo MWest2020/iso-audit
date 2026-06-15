@@ -101,12 +101,13 @@ def _memo_met_nc(triage: str, reasoning: list[str]) -> AuditMemo:
     return m
 
 
-def test_triage_checklist_voor_kandidaat() -> None:
+def test_triage_checklist_voor_open_kandidaat() -> None:
     html = MemoRendererImpl().render_html(
-        _memo_met_nc("te_verifieren", ["ruwe bevinding A", "ruwe bevinding B"]), _profiel()
+        _memo_met_nc("open", ["ruwe bevinding A", "ruwe bevinding B"]), _profiel()
     )
     assert 'class="triage"' in html
-    assert "☑ te verifiëren" in html
+    assert "Nog te beoordelen" in html
+    assert "valide" in html and "niet valide" in html
     assert "Waarop gebaseerd" in html
     assert "ruwe bevinding A" in html
 

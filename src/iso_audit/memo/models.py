@@ -13,9 +13,10 @@ from pydantic import BaseModel, Field
 
 Severity = Literal["NC", "OFI", "POSITIVE", "UNCLASSIFIED"]
 HistoricalStatus = Literal["open", "in_progress", "closed"]
-# Auditor-triage van een kandidaat-NC. `te_verifieren` = tool flagde, mens moet
-# bevestigen; `nader_onderzoek` = bewijs mogelijk buiten tool-scope (auditsessie).
-TriageStatus = Literal["te_verifieren", "valide", "nader_onderzoek"]
+# Auditor-triage van een kandidaat-NC. `open` = nog te beoordelen (default);
+# `valide` = bevestigde NC; `niet_valide` = geen echte NC (bv. bewijs bestaat
+# buiten tool-scope). De auditor gaat er sowieso doorheen → binaire keuze.
+TriageStatus = Literal["open", "valide", "niet_valide"]
 
 
 # --- Input-modellen ---------------------------------------------------------
@@ -43,7 +44,7 @@ class Finding(BaseModel):
     suggestion: str | None = None
     # Triage-checklist: redenatie (wat de tool aantrof) + auditor-status.
     reasoning: list[str] = Field(default_factory=list)
-    triage_status: TriageStatus = "te_verifieren"
+    triage_status: TriageStatus = "open"
 
 
 class HistoricalNC(BaseModel):
@@ -91,7 +92,7 @@ class NCBlock(BaseModel):
     # Triage-checklist (auditor-spiegel): redenatie + status. Bij `valide` toont
     # de render geen checklist (bevestigde NC); anders wel.
     reasoning: list[str] = Field(default_factory=list)
-    triage_status: TriageStatus = "te_verifieren"
+    triage_status: TriageStatus = "open"
 
 
 class ImprovementBlock(BaseModel):

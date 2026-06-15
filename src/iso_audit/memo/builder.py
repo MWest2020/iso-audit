@@ -86,7 +86,12 @@ def build_memo(
     detector = DefaultPatternDetector()
     lang = language or profile.defaults.language
 
-    nc_blocks = [_nc_block(f, findings, norm_db, detector, lang) for f in classifier.ncs(findings)]
+    # Niet_valide kandidaten zijn door de auditor afgewezen → geen NC in de memo.
+    nc_blocks = [
+        _nc_block(f, findings, norm_db, detector, lang)
+        for f in classifier.ncs(findings)
+        if f.triage_status != "niet_valide"
+    ]
     improvements = [
         _improvement_block(f, norm_db, lang) for f in classifier.improvements(findings, threshold)
     ]

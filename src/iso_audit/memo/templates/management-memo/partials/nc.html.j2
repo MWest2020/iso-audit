@@ -1,15 +1,10 @@
 {#- Eén NC-blok (variabele `nc`) -#}
 <h2>{{ nc.title }}</h2>
 
-{% if nc.triage_status != "valide" %}
+{% if nc.triage_status == "open" %}
 <div class="triage">
-  <strong>Triage (auditor):</strong>
-  <span class="opties">
-  {%- for key, label in [("te_verifieren", "te verifiëren"), ("valide", "valide"), ("nader_onderzoek", "nader onderzoek / audit nodig")] %}
-    {{ "☑" if nc.triage_status == key else "☐" }} {{ label }}{{ "   ·" if not loop.last }}
-  {%- endfor %}
-  </span>
-  <div class="triage-note">Bewijs kan binnen de organisatie bestaan maar buiten de tool-scope (Drive/Miro) vallen — verifieer in de auditsessie.</div>
+  <strong>Nog te beoordelen (auditor):</strong> <span class="opties">☐ valide · ☐ niet valide</span>
+  <div class="triage-note">Bewijs kan binnen de organisatie bestaan maar buiten de tool-scope (Drive/Miro) vallen — beoordeel in de auditsessie.</div>
 </div>
 {% endif %}
 

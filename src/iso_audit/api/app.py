@@ -85,8 +85,22 @@ def create_app(session: AuditSession) -> FastAPI:
         """Stap 2: samenvatting van de (geladen) run-output."""
         return session.run_summary()
 
+    @app.get("/triage/status")
+    def triage_status() -> dict[str, object]:
+        """Voortgang van de triage; de memo is gated tot dit compleet is."""
+        return session.triage_summary()
+
+    def _eis_triage_compleet() -> None:
+        s = session.triage_summary()
+        if not s["complete"]:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Triage niet compleet: {s['open']} kandidaat-NC('s) nog open.",
+            )
+
     @app.get("/memo/preview", response_class=HTMLResponse)
     def memo_preview() -> str:
+        _eis_triage_compleet()
         try:
             return session.render_html()
         except (SessionError, ValueError, OSError) as exc:
@@ -94,6 +108,7 @@ def create_app(session: AuditSession) -> FastAPI:
 
     @app.post("/memo/export")
     def memo_export() -> dict[str, str]:
+        _eis_triage_compleet()
         pad = session.export_pdf(session.dir / "Auditmemo_management.pdf")
         return {"pdf": str(pad)}
 

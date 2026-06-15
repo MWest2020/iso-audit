@@ -19,7 +19,7 @@ _FINDINGS = [
         "clause": "6.5",
         "title": "Offboarding",
         "description": "Offboarding niet aantoonbaar afgesloten.",
-        "triage_status": "te_verifieren",
+        "triage_status": "valide",
     },
     {
         "id": "f2",
@@ -66,10 +66,23 @@ def test_reclassify_nc_naar_ofi_append_only(tmp_path: Path) -> None:
 def test_triage_status_append_groeit(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.post("/findings/f1", json={"severity": "OFI", "reason": "r1"})
-    client.post("/findings/f1", json={"triage_status": "nader_onderzoek", "reason": "r2"})
+    client.post("/findings/f1", json={"triage_status": "niet_valide", "reason": "r2"})
     trail = client.get("/trail").json()
     assert len(trail) == 2  # append-only: eerste blijft staan
     assert trail[1]["field"] == "triage_status"
+
+
+def test_memo_gated_bij_open_kandidaat(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    # zet de NC terug naar 'open' → memo moet 409'en (triage niet compleet).
+    client.post("/findings/f1", json={"triage_status": "open", "reason": "heropenen"})
+    assert client.get("/triage/status").json()["complete"] is False
+    assert client.get("/memo/preview").status_code == 409
+
+
+def test_triage_status_endpoint(tmp_path: Path) -> None:
+    d = _client(tmp_path).get("/triage/status").json()
+    assert d == {"total_nc": 1, "open": 0, "complete": True}
 
 
 def test_onbekende_finding_404(tmp_path: Path) -> None:

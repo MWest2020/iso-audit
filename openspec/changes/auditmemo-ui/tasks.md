@@ -19,7 +19,8 @@
 
 ## 2. Frontend — triage + memo-review (capability: memo-ui)
 
-- [x] 2.1 Web-pagina (`api/ui.html`, vanilla JS, geen build/deps): findings-lijst met NC↔OFI-toggle + triage-select; severity-filter (NC-kandidaten / alle)
+- [x] 2.1 Web-pagina (`api/ui.html`, vanilla JS, geen build/deps): findings-lijst met NC↔OFI/POSITIVE-toggle (geen UNCLASSIFIED) + triage-select; severity-filter (NC-kandidaten / alle)
+- [x] 2.1b Triage versimpeld naar `open`/`valide`/`niet_valide`; `niet_valide` valt uit de memo. **Memo-stap gated**: greyed-out + server-side 409 tot 0 openstaande NC-kandidaten (`GET /triage/status`)
 - [ ] 2.2 Memo-review: live HTML-preview (iframe) + PDF-export ✓; **inline redactie** van kop-NC-tekst (titel/afwijking/maatregel/acties) is follow-up (vereist tekstveld-PATCH op de API)
 - [x] 2.3 Geen logica in de frontend — alles via de API (severity/triage/preview/export)
 

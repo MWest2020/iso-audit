@@ -138,6 +138,12 @@ class AuditSession:
             ),
         }
 
+    def triage_summary(self) -> dict[str, object]:
+        """Triage-voortgang: een memo mag pas bij 0 openstaande NC-kandidaten."""
+        nc = [f for f in self.findings() if f.severity == "NC"]
+        open_n = sum(1 for f in nc if f.triage_status == "open")
+        return {"total_nc": len(nc), "open": open_n, "complete": open_n == 0}
+
     def trail(self) -> list[dict[str, str]]:
         """De append-only triage-trail (chronologisch)."""
         if not self.triage_log.is_file():

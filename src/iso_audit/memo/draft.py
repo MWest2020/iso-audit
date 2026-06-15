@@ -101,7 +101,7 @@ def _draft_cluster(
         corrective_measure=str(data.get("corrective_measure") or ""),
         actions=[ActionRow(wat="(actie in te vullen door auditor)")],
         reasoning=reasoning,
-        triage_status="te_verifieren",
+        triage_status="open",
     )
 
 
