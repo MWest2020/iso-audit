@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-15 — `ONBOARDING.md` als levend onboarding-document
+
+- **`ONBOARDING.md`** toegevoegd: van-nul-naar-productief voor iedereen die
+  de repo oppakt. Mentaal model, mappenoverzicht, veelgebruikte commando's,
+  **"een adapter toevoegen"** (lost ongedocumenteerd registry-patroon op),
+  uitleg auditor-interview, en de richting UI + DB-config. Gelinkt vanuit
+  README. Reden: repo overdraagbaar maken (zie ook docstring-fixes hieronder).
+- **`src/iso_audit/interview.py`** docstring herschreven: expliciete status
+  ("bewust ondersteunde auditor-tool, geen legacy"), verwijzing naar de
+  auditor-spiegel-capability en `ONBOARDING.md` §7. Verving de Ops_to_Biz-
+  migratienotitie. Reden: module was onzichtbaar/ongedocumenteerd.
+
+### Changed — 2026-06-15 — housekeeping: scope-opschoning + doc-debt
+
+- **`openspec/changes/hww-2-0/` → `archive/`.** Deze change gaat over de
+  Docusaurus-website (`ConductionNL/.github`), niet over iso-audit, en was
+  per ongeluk meeverhuisd uit `Ops_to_Biz`. Verplaatst (niet verwijderd)
+  met `NOTE.md` die de scope en de bij de website-repo horende open tasks
+  vastlegt. Reden: schone change-lijst vóór de milestone-B merge naar main.
+- **`src/iso_audit/sinks/__init__.py` docstring.** Verwijderde de verouderde
+  "spec-only in milestone A"-tekst; `DriveSink` bestaat. Verwees naar
+  `ONBOARDING.md` voor het toevoegen van een adapter. Reden: documentatie-
+  debt uit modulariteit-audit (lezer dacht dat sinks nog niet werkten).
+
 ### Fixed — 2026-05-26 — `.gitignore` aangevuld met secret-patronen
 
 - **`.gitignore`** uitgebreid met `*.pem`, `*.key`, `*_rsa`, `*.crt`,

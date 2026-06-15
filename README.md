@@ -36,6 +36,7 @@ stap in **[`MEMORY.md`](MEMORY.md)**.
 
 ## Documentatie
 
+- **[`ONBOARDING.md`](ONBOARDING.md)** — van nul naar productief; waar staat wat, hoe voeg je een adapter toe
 - **[`docs/missie.md`](docs/missie.md)** — drie capabilities en het rolconflict-frame
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — protocol-lagen, registries, pipeline-flow
 - **[`docs/sources/`](docs/sources/)** — per bron-adapter (drive, planning, jira, mcp, rest)

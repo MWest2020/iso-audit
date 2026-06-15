@@ -1,12 +1,14 @@
 """Audit interview — interactieve doorloop van ongedekte clausules.
 
-Gemigreerd uit `Ops_to_Biz/audit/interview.py` per milestone B §2.5.8.
-Wijzigingen: imports verwezen naar `iso_audit.*`; type-hints aangevuld
-voor mypy --strict; `main()` accepteert optionele `argv` voor tests.
+Status: **bewust ondersteunde auditor-tool**, geen legacy. Dit is de
+*auditor-spiegel*-capability uit ``docs/missie.md`` in code — zie
+``ONBOARDING.md`` §7. Standalone CLI: wordt door geen andere module
+geïmporteerd en draait los van de pipeline.
 
 Geen LLM nodig. Vraagt per ongedekte clausule of de praktijk bestaat in de
-organisatie, ook als die niet gedocumenteerd is. Antwoorden worden
-opgeslagen als bevindingen.
+organisatie, ook als die niet gedocumenteerd is — zo voorkomt het dat de
+automatisering een gap ("niet gedocumenteerd") foutief als NC ("bestaat
+niet") rapporteert. Antwoorden worden opgeslagen als bevindingen.
 
 Bevindingen:
     positief     — praktijk bestaat en is (voldoende) gedocumenteerd/geborgd
