@@ -6,13 +6,13 @@
 
 ## 0. Voorbereiding
 
-- [ ] 0.1 Deps toevoegen via `uv add` (typer, rich, pydantic, jinja2, weasyprint); `uv.lock` committen; WeasyPrint systeem-libs (pango/cairo) documenteren in README
-- [ ] 0.2 Beslis CLI-integratie argparse ↔ Typer: `memo`/`profile` als Typer-subapp achter de bestaande `iso-audit` console-script (design.md "Niet opgelost")
-- [ ] 0.3 `iso_audit/memo/`-skeleton + `protocols.py` met `MemoRenderer`, `NormLookup`, `FindingsClassifier`, `ProfileLoader`, `PatternDetector`
+- [x] 0.1 Deps toevoegen via `uv add` (typer, rich, pydantic, jinja2, weasyprint); `uv.lock` gecommit. WeasyPrint systeem-libs (pango/cairo): aanwezig op dev-machine; nog documenteren in README (task 8.1)
+- [x] 0.2 CLI-integratie-besluit: `memo`/`profile` als Typer-subapp achter de bestaande `iso-audit` console-script (akkoord Mark 2026-06-15)
+- [x] 0.3 `iso_audit/memo/`-skeleton + `protocols.py` met `MemoRenderer`, `NormLookup`, `FindingsClassifier`, `ProfileLoader`, `PatternDetector`
 
 ## 1. Models & contracten
 
-- [ ] 1.1 `models.py`: pydantic v2 `Finding`, `HistoricalNC`, `MemoContext`, `MemoActionRow` (zie design.md schema's)
+- [x] 1.1 `models.py`: pydantic v2 `Finding`, `HistoricalNC`, `MemoContext`, `ActionRow`, `NCBlock`, `ImprovementBlock`, `ClauseCitation`, `AuditMemo`
 - [ ] 1.2 Findings-input loader (`examples/findings.json`-contract); validatie + duidelijke fouten
 
 ## 2. Norm-database (capability: norm-database)
@@ -24,8 +24,8 @@
 
 ## 3. Profielsysteem (capability: memo-profiles)
 
-- [ ] 3.1 `theme/profile.py`: Profile-model + loader, `schema_version`-check, kleurpalet met afgeleide defaults, hex-validatie
-- [ ] 3.2 `theme/svg_validator.py`: weiger `<script>`/`<foreignObject>`/externe `<image>`
+- [x] 3.1 `theme/profile.py`: Profile-model + loader (XDG-slug + pad-traversal-guard), `schema_version`-check, kleurpalet met afgeleide defaults, hex-validatie, policy-gates → `ProfileError`. + 6 tests
+- [x] 3.2 `theme/svg_validator.py`: weiger `<script>`/`<foreignObject>`/externe `<image>`/event-handler/javascript-URI/externe-entity. + 9 tests
 - [ ] 3.3 `theme/elicitation.py`: first-run wizard (8 stappen), opslaan naar XDG-locatie
 - [ ] 3.4 `cli.py`: `profile new/list/show/validate`; `--profile <path>` met traversal-guard
 - [ ] 3.5 `data/profiles/conduction.example.yaml` + `minimal.example.yaml`
