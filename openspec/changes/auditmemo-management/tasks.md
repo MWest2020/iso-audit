@@ -13,7 +13,7 @@
 ## 1. Models & contracten
 
 - [x] 1.1 `models.py`: pydantic v2 `Finding`, `HistoricalNC`, `MemoContext`, `ActionRow`, `NCBlock`, `ImprovementBlock`, `ClauseCitation`, `AuditMemo`
-- [ ] 1.2 Findings-input loader (`examples/findings.json`-contract); validatie + duidelijke fouten
+- [x] 1.2 Findings-input loader (`_laad_findings` in `cli.py`: JSON-lijst → `Finding`-models, duidelijke fout bij verkeerd type); gedekt door de integratietest
 
 ## 2. Norm-database (capability: norm-database)
 
