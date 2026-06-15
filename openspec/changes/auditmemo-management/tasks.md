@@ -17,10 +17,10 @@
 
 ## 2. Norm-database (capability: norm-database)
 
-- [ ] 2.1 `norm_lookup.py`: laad `data/norms/<slug>.yaml` (plug-in; ook user-pad), `safe_load`
-- [ ] 2.2 Meertalige lookup (NL/EN) per clausule; hard-fail bij ontbrekende clausule
-- [ ] 2.3 `data/norms/iso-9001-2015.yaml` + `iso-27001-2022.yaml` met minimaal de referentie-clausules (4.4, 5.11, 5.18, 5.24, 5.27, 6.3, 6.5, 8.13, 8.15, 8.16, 10.1, 10.2)
-- [ ] 2.4 `/security-review`: `safe_load`, geen path-traversal op user-pad
+- [x] 2.1 `norm_lookup.py`: `NormDatabase` laadt user-pointed directory met `<slug>.yaml`, `safe_load`, geen magische default
+- [x] 2.2 Meertalige lookup (`title_<lang>`/`text_<lang>`); hard-fail bij ontbrekende clausule én ontbrekende taal-tekst. + 7 tests
+- [x] 2.3 NL-voorbeeld-DB `examples/norms/iso-9001-2015.yaml` + `iso-27001-2022.yaml` (referentie-clausules, verbatim uit repo-normteksten; EN leeg = user-provided)
+- [ ] 2.4 `/security-review`: `safe_load` ✓ in code; nog formele review op path-handling van de user-pointed dir
 
 ## 3. Profielsysteem (capability: memo-profiles)
 

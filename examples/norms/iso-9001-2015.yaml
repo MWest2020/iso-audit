@@ -1,0 +1,31 @@
+metadata:
+  standard: ISO 9001:2015
+  slug: iso-9001-2015
+  source: iso_audit.data.normteksten (verkorte NL-weergave, repo-bron) — geen officiële ISO-volledige
+    tekst
+clauses:
+  '4.4':
+    title_nl: Kwaliteitsmanagementsysteem en de processen ervan
+    title_en: ''
+    text_nl: De organisatie moet de processen die nodig zijn voor het kwaliteitsmanagementsysteem
+      en hun onderlinge samenhang bepalen, implementeren, onderhouden en continu verbeteren.
+    text_en: ''
+  '6.3':
+    title_nl: Planning van wijzigingen
+    title_en: ''
+    text_nl: Wanneer de organisatie bepaalt dat wijzigingen in het kwaliteitsmanagementsysteem
+      nodig zijn, moeten deze wijzigingen op een geplande manier worden doorgevoerd.
+    text_en: ''
+  '10.1':
+    title_nl: Algemeen (verbetering)
+    title_en: ''
+    text_nl: De organisatie moet kansen voor verbetering bepalen en selecteren en de nodige
+      acties implementeren om aan klanteisen te voldoen en de klanttevredenheid te verhogen.
+    text_en: ''
+  '10.2':
+    title_nl: Non-conformiteit en corrigerende maatregel
+    title_en: ''
+    text_nl: Bij het optreden van een non-conformiteit moet de organisatie reageren, de oorzaak
+      bepalen, beoordelen of vergelijkbare situaties bestaan en correctieve maatregelen nemen.
+      Effectiviteit moet worden beoordeeld en gedocumenteerde informatie bewaard.
+    text_en: ''
