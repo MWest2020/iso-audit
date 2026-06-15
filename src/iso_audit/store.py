@@ -1,0 +1,494 @@
+"""Lokale SQLite opslag voor audit-landschap.
+
+Schema:
+  documents       — Drive-bestanden met volledige tekst
+  miro_notes      — Miro sticky notes / tekstvakken
+  clause_matches  — welke documenten matchen welke clausules
+  ingest_log      — wanneer is welke bron voor het laatst gesynchroniseerd
+  bevindingen     — geclassificeerde audit-bevindingen (NC/OFI/positief)
+  interviews      — handmatige bevindingen per clausule
+  classifications — traceability-laag (§2.6.3): elke LLM-call wordt vóór
+                    consumptie gepersisteerd inclusief prompt/model-versie,
+                    input-hash, raw output, usage en duur. Dedup-key:
+                    (audit_id, finding_id, prompt_versie, model_versie).
+  decisions       — audit-trail (§3.1.3): elk hoog-risico beslismoment
+                    (autonoom selectief; integer altijd voor hoog) plus
+                    de uiteindelijke auditor-actie. Append-only.
+
+FTS5 full-text search op documents.naam + documents.tekst voor lokaal
+zoeken zonder API-kosten.
+
+Schema-stabiliteit: het schema is ongewijzigd t.o.v. `Ops_to_Biz/audit/store.py`
+op de bestaande tabellen. Nieuwe tabellen (`classifications`) zijn additief
+en idempotent (`CREATE TABLE IF NOT EXISTS`); oude `audit.db`-bestanden
+blijven werken.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import os
+import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# src/iso_audit/store.py → parent (iso_audit) → parent (src) → parent (repo root)
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+DEFAULT_DB_PATH = str(_REPO_ROOT / "output" / "audit.db")
+
+
+def db_pad() -> str:
+    """Lokatie van de SQLite-database; override via `AUDIT_DB_PATH`-env."""
+    return os.environ.get("AUDIT_DB_PATH", DEFAULT_DB_PATH)
+
+
+def verbinding(pad: str | None = None) -> sqlite3.Connection:
+    """Open SQLite-verbinding met WAL + foreign keys aan."""
+    pad = pad or db_pad()
+    parent = os.path.dirname(pad)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    conn = sqlite3.connect(pad)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+
+def initialiseer(conn: sqlite3.Connection) -> None:
+    """Maak alle tabellen aan als ze nog niet bestaan."""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id          TEXT PRIMARY KEY,
+            naam        TEXT NOT NULL,
+            tekst       TEXT NOT NULL DEFAULT '',
+            herkomst    TEXT NOT NULL DEFAULT 'Drive',
+            mime_type   TEXT,
+            modified_at TEXT,           -- Drive modifiedTime (ISO 8601), NULL als onbekend
+            ingested_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS miro_notes (
+            id                TEXT PRIMARY KEY,
+            tekst             TEXT NOT NULL,
+            kleur             TEXT,
+            pre_classificatie TEXT,
+            board_id          TEXT,
+            ingested_at       TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS clause_matches (
+            doc_id      TEXT NOT NULL,
+            herkomst    TEXT NOT NULL,   -- 'Drive' | 'Miro'
+            clausule_id TEXT NOT NULL,
+            norm        TEXT NOT NULL,
+            sub_punt    TEXT NOT NULL DEFAULT '',  -- '' = clausule-niveau, 'a'/'b'/... = sub-punt
+            PRIMARY KEY (doc_id, herkomst, clausule_id, sub_punt)
+        );
+
+        CREATE TABLE IF NOT EXISTS ingest_log (
+            bron        TEXT PRIMARY KEY,  -- 'drive' | 'miro'
+            folder_id   TEXT,
+            bestand_count INTEGER,
+            last_run    TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS bevindingen (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_id           TEXT NOT NULL,
+            herkomst         TEXT NOT NULL,
+            clausule_id      TEXT NOT NULL,
+            norm             TEXT NOT NULL,
+            classificatie    TEXT NOT NULL,
+            beschrijving     TEXT,
+            onderbouwing     TEXT,
+            pre_classificatie TEXT,
+            document_naam    TEXT,
+            classified_at    TEXT NOT NULL,
+            UNIQUE(doc_id, herkomst, clausule_id, norm)
+        );
+
+        CREATE TABLE IF NOT EXISTS interviews (
+            clausule_id    TEXT NOT NULL,
+            norm           TEXT NOT NULL,
+            bevinding      TEXT NOT NULL,  -- 'NC' | 'OFI' | 'positief' | 'overgeslagen'
+            antwoord       TEXT,           -- korte ja/nee/deels samenvatting
+            notitie        TEXT,           -- vrije toelichting van de auditor
+            interviewed_at TEXT NOT NULL,
+            PRIMARY KEY (clausule_id, norm)
+        );
+
+        CREATE TABLE IF NOT EXISTS classifications (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_id        TEXT NOT NULL,    -- run-id voor groepering
+            finding_id      TEXT NOT NULL,    -- 'drive:<doc>:<clausule>' of 'miro:<batch>'
+            input_hash      TEXT NOT NULL,    -- sha256(system + user)
+            prompt_versie   TEXT NOT NULL,    -- sha256(system) — prompt-logic-versie
+            model_versie    TEXT NOT NULL,    -- bv. claude-haiku-4-5-20251001
+            raw_output      TEXT,             -- response.content[0].text
+            usage_json      TEXT,             -- {input_tokens, output_tokens, cache_*}
+            elapsed_s       REAL,
+            created_at      TEXT NOT NULL,
+            UNIQUE(audit_id, finding_id, prompt_versie, model_versie)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_classifications_audit
+            ON classifications(audit_id);
+        CREATE INDEX IF NOT EXISTS idx_classifications_finding
+            ON classifications(finding_id);
+
+        CREATE TABLE IF NOT EXISTS decisions (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_id         TEXT NOT NULL,
+            punt             TEXT NOT NULL,    -- e.g. 'classify_finding', 'send_report'
+            context_json     TEXT NOT NULL,
+            voorstel_json    TEXT NOT NULL,
+            status           TEXT NOT NULL,    -- 'pending' | 'resolved' | 'cancelled'
+            besluit_json     TEXT,             -- definitief besluit; NULL als status=pending
+            risico           TEXT NOT NULL,    -- 'laag' | 'midden' | 'hoog'
+            classificatie_id INTEGER,          -- optionele link naar classifications.id
+            -- notifier_naam: NULL voor autonoom; 'slack'/'email'/... voor integer
+            notifier_naam    TEXT,
+            created_at       TEXT NOT NULL,
+            resolved_at      TEXT,
+            FOREIGN KEY (classificatie_id) REFERENCES classifications(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_decisions_audit_status
+            ON decisions(audit_id, status);
+        CREATE INDEX IF NOT EXISTS idx_decisions_punt_resolved
+            ON decisions(punt, resolved_at);
+
+        -- FTS5 full-text search over naam + tekst
+        CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts
+            USING fts5(naam, tekst, content=documents, content_rowid=rowid);
+
+        -- FTS triggers to keep index in sync
+        CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
+            INSERT INTO documents_fts(rowid, naam, tekst)
+            VALUES (new.rowid, new.naam, new.tekst);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
+            INSERT INTO documents_fts(documents_fts, rowid, naam, tekst)
+            VALUES ('delete', old.rowid, old.naam, old.tekst);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+            INSERT INTO documents_fts(documents_fts, rowid, naam, tekst)
+            VALUES ('delete', old.rowid, old.naam, old.tekst);
+            INSERT INTO documents_fts(rowid, naam, tekst)
+            VALUES (new.rowid, new.naam, new.tekst);
+        END;
+    """)
+    conn.commit()
+
+
+def upsert_document(conn: sqlite3.Connection, doc: dict[str, Any]) -> None:
+    """Idempotente insert/update van een document-rij."""
+    conn.execute(
+        """
+        INSERT INTO documents (id, naam, tekst, herkomst, mime_type, modified_at, ingested_at)
+        VALUES (:id, :naam, :tekst, :herkomst, :mime_type, :modified_at, :ingested_at)
+        ON CONFLICT(id) DO UPDATE SET
+            naam        = excluded.naam,
+            tekst       = excluded.tekst,
+            herkomst    = excluded.herkomst,
+            mime_type   = excluded.mime_type,
+            modified_at = COALESCE(excluded.modified_at, modified_at),
+            ingested_at = excluded.ingested_at
+        """,
+        {
+            "id": doc["id"],
+            "naam": doc["naam"],
+            "tekst": doc.get("tekst", ""),
+            "herkomst": doc.get("herkomst", "Drive"),
+            "mime_type": doc.get("mime_type"),
+            "modified_at": doc.get("modified_at"),
+            "ingested_at": now(),
+        },
+    )
+
+
+def upsert_miro_note(conn: sqlite3.Connection, note: dict[str, Any]) -> None:
+    """Idempotente insert/update van een Miro-note."""
+    conn.execute(
+        """
+        INSERT INTO miro_notes (id, tekst, kleur, pre_classificatie, board_id, ingested_at)
+        VALUES (:id, :tekst, :kleur, :pre_classificatie, :board_id, :ingested_at)
+        ON CONFLICT(id) DO UPDATE SET
+            tekst             = excluded.tekst,
+            kleur             = excluded.kleur,
+            pre_classificatie = excluded.pre_classificatie,
+            ingested_at       = excluded.ingested_at
+        """,
+        {
+            "id": note["miro_item_id"],
+            "tekst": note["tekst"],
+            "kleur": note.get("kleur"),
+            "pre_classificatie": note.get("pre_classificatie"),
+            "board_id": note.get("board_id"),
+            "ingested_at": now(),
+        },
+    )
+
+
+def upsert_clause_match(
+    conn: sqlite3.Connection,
+    doc_id: str,
+    herkomst: str,
+    clausule_id: str,
+    norm: str,
+    sub_punt: str = "",
+) -> None:
+    """Markeer dat een document een clausule raakt; sub_punt optioneel."""
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO clause_matches (doc_id, herkomst, clausule_id, norm, sub_punt)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (doc_id, herkomst, clausule_id, norm, sub_punt or ""),
+    )
+
+
+def log_ingest(conn: sqlite3.Connection, bron: str, folder_id: str | None, count: int) -> None:
+    """Leg vast wanneer een bron voor het laatst is gesynchroniseerd."""
+    conn.execute(
+        """
+        INSERT INTO ingest_log (bron, folder_id, bestand_count, last_run)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(bron) DO UPDATE SET
+            folder_id     = excluded.folder_id,
+            bestand_count = excluded.bestand_count,
+            last_run      = excluded.last_run
+        """,
+        (bron, folder_id, count, now()),
+    )
+    conn.commit()
+
+
+def zoek(conn: sqlite3.Connection, query: str, limit: int = 20) -> list[sqlite3.Row]:
+    """Full-text search over document-namen en inhoud (FTS5)."""
+    result: list[sqlite3.Row] = conn.execute(
+        """
+        SELECT d.id, d.naam, d.herkomst, d.mime_type,
+               snippet(documents_fts, 1, '[', ']', '...', 20) AS fragment
+        FROM documents_fts f
+        JOIN documents d ON d.rowid = f.rowid
+        WHERE documents_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
+        """,
+        (query, limit),
+    ).fetchall()
+    return result
+
+
+def upsert_interview(
+    conn: sqlite3.Connection,
+    clausule_id: str,
+    norm: str,
+    bevinding: str,
+    antwoord: str | None = None,
+    notitie: str | None = None,
+) -> None:
+    """Idempotente insert/update van een handmatige interview-bevinding."""
+    conn.execute(
+        """
+        INSERT INTO interviews (clausule_id, norm, bevinding, antwoord, notitie, interviewed_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(clausule_id, norm) DO UPDATE SET
+            bevinding      = excluded.bevinding,
+            antwoord       = excluded.antwoord,
+            notitie        = excluded.notitie,
+            interviewed_at = excluded.interviewed_at
+        """,
+        (clausule_id, norm, bevinding, antwoord, notitie, now()),
+    )
+
+
+def laad_interviews(conn: sqlite3.Connection, norm: str | None = None) -> list[sqlite3.Row]:
+    """Laad alle interviews, optioneel gefilterd op norm (`9001`/`27001`)."""
+    if norm:
+        result: list[sqlite3.Row] = conn.execute(
+            "SELECT * FROM interviews WHERE norm = ? ORDER BY clausule_id",
+            (norm,),
+        ).fetchall()
+        return result
+    return conn.execute("SELECT * FROM interviews ORDER BY clausule_id").fetchall()
+
+
+def now() -> str:
+    """UTC-tijdstempel als ISO 8601-string (voor `*_at`-kolommen)."""
+    return datetime.now(UTC).isoformat()
+
+
+def _sha256(tekst: str) -> str:
+    """Hex-digest van sha256 over `tekst`."""
+    return hashlib.sha256(tekst.encode("utf-8")).hexdigest()
+
+
+def log_classification(
+    conn: sqlite3.Connection,
+    audit_id: str,
+    finding_id: str,
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    raw_output: str | None,
+    usage: dict[str, Any] | None = None,
+    elapsed_s: float | None = None,
+) -> None:
+    """Persisteer een LLM-call vóór consumptie van de output (§2.6.4).
+
+    Dedup-key: `(audit_id, finding_id, prompt_versie, model_versie)`.
+    Reruns met dezelfde prompt-versie + model overschrijven niet — de
+    classificatie blijft een append-only trace.
+
+    De `system_prompt` bepaalt `prompt_versie` (sha256); de combinatie
+    van `system_prompt + user_prompt` bepaalt `input_hash`.
+    """
+    prompt_versie = _sha256(system_prompt)
+    input_hash = _sha256(system_prompt + "\n---\n" + user_prompt)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO classifications
+            (audit_id, finding_id, input_hash, prompt_versie, model_versie,
+             raw_output, usage_json, elapsed_s, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            audit_id,
+            finding_id,
+            input_hash,
+            prompt_versie,
+            model,
+            raw_output,
+            json.dumps(usage) if usage is not None else None,
+            elapsed_s,
+            now(),
+        ),
+    )
+
+
+def laad_classifications(
+    conn: sqlite3.Connection,
+    audit_id: str | None = None,
+    finding_id: str | None = None,
+) -> list[sqlite3.Row]:
+    """Laad classifications-rijen, optioneel gefilterd op audit/finding."""
+    if audit_id and finding_id:
+        return conn.execute(
+            "SELECT * FROM classifications WHERE audit_id=? AND finding_id=? ORDER BY created_at",
+            (audit_id, finding_id),
+        ).fetchall()
+    if audit_id:
+        return conn.execute(
+            "SELECT * FROM classifications WHERE audit_id=? ORDER BY created_at",
+            (audit_id,),
+        ).fetchall()
+    if finding_id:
+        return conn.execute(
+            "SELECT * FROM classifications WHERE finding_id=? ORDER BY created_at",
+            (finding_id,),
+        ).fetchall()
+    return conn.execute("SELECT * FROM classifications ORDER BY created_at").fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Decisions (§3.1.3) — append-only audit-trail van Mode-beslissingen
+# ---------------------------------------------------------------------------
+
+
+def schrijf_decision(
+    conn: sqlite3.Connection,
+    audit_id: str,
+    punt: str,
+    context: dict[str, Any],
+    voorstel: dict[str, Any],
+    risico: str,
+    status: str,
+    besluit: dict[str, Any] | None = None,
+    notifier_naam: str | None = None,
+    classificatie_id: int | None = None,
+) -> int:
+    """Schrijf een nieuwe rij naar `decisions` en retourneer de toegekende id.
+
+    Status MOET `pending`, `resolved` of `cancelled` zijn. Bij `resolved`
+    is `resolved_at` automatisch gevuld met `now()`.
+    """
+    if status not in ("pending", "resolved", "cancelled"):
+        raise ValueError(
+            f"decisions.status moet 'pending', 'resolved' of 'cancelled' zijn — kreeg {status!r}"
+        )
+    resolved_at = now() if status in ("resolved", "cancelled") else None
+    cur = conn.execute(
+        """
+        INSERT INTO decisions
+            (audit_id, punt, context_json, voorstel_json, status, besluit_json,
+             risico, classificatie_id, notifier_naam, created_at, resolved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            audit_id,
+            punt,
+            json.dumps(context),
+            json.dumps(voorstel),
+            status,
+            json.dumps(besluit) if besluit is not None else None,
+            risico,
+            classificatie_id,
+            notifier_naam,
+            now(),
+            resolved_at,
+        ),
+    )
+    conn.commit()
+    return int(cur.lastrowid or 0)
+
+
+def resolve_decision(
+    conn: sqlite3.Connection,
+    decision_id: int,
+    besluit: dict[str, Any],
+    status: str = "resolved",
+) -> None:
+    """Update een `pending` decision-rij met definitief besluit en `resolved_at`.
+
+    Append-only-discipline: rijen met `status != "pending"` worden NOOIT
+    overschreven; de update doet niets als de rij al resolved/cancelled is.
+    """
+    if status not in ("resolved", "cancelled"):
+        raise ValueError(
+            f"resolve_decision: status moet 'resolved' of 'cancelled' zijn — kreeg {status!r}"
+        )
+    conn.execute(
+        """
+        UPDATE decisions
+        SET besluit_json = ?, status = ?, resolved_at = ?
+        WHERE id = ? AND status = 'pending'
+        """,
+        (json.dumps(besluit), status, now(), decision_id),
+    )
+    conn.commit()
+
+
+def laad_decision(conn: sqlite3.Connection, decision_id: int) -> sqlite3.Row | None:
+    """Geef één decision-rij terug op id, of `None` als niet bestaat."""
+    row: sqlite3.Row | None = conn.execute(
+        "SELECT * FROM decisions WHERE id = ?", (decision_id,)
+    ).fetchone()
+    return row
+
+
+def laad_pending_decisions(conn: sqlite3.Connection, audit_id: str) -> list[sqlite3.Row]:
+    """Alle `status='pending'` rijen voor een audit-run (voor crash-recovery)."""
+    return conn.execute(
+        "SELECT * FROM decisions WHERE audit_id = ? AND status = 'pending' ORDER BY created_at",
+        (audit_id,),
+    ).fetchall()

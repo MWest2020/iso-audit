@@ -71,7 +71,9 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --dev --frozen
-      # Coverage-gate is 60% in milestone A — zonder geïmplementeerde adapters is
-      # hoger niveau triviaal of misleidend. Definitieve gate na baseline-meting in
-      # milestone B; per project_audit_volgende_stappen.md plafond op 85%.
-      - run: uv run pytest --cov --cov-fail-under=60
+      # Coverage-gate 70% per milestone B baseline-meting (2026-05-13):
+      # baseline op huidige Ops_to_Biz/audit = 0% (geen tests in oude codebase);
+      # gate = max(baseline + 5%, 70%) = 70%; plafond 85% per
+      # project_audit_volgende_stappen.md. Huidige iso-audit M-A scaffolding
+      # rapporteert 80% coverage (211 stmts, 38 missed) — ruim boven gate.
+      - run: uv run pytest --cov --cov-fail-under=70

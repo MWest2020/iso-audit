@@ -81,9 +81,10 @@ uv run pre-commit run --all-files                # alles bij elkaar
 
 - **ArgoCD-sync code.** Blijft in `MWest2020/Ops_to_Biz`.
 - **Cockpit / business-view-filter werk.** Blijft in `Ops_to_Biz`.
-- **`miro-incident-board` en `miro-desired-state` migratie.** Eigen change-
-  proposal wanneer deze consumers actief op de geconsolideerde Miro-laag
-  raken.
+- **Miro write-flow.** Per change `miro-write-trim` (mei 2026) zijn
+  `board_setup` en `interview` verwijderd; Miro is binnen iso-audit
+  **READ-only**. Boards opzetten doet de auditor via Miro-AI — zie
+  `docs/miro-auditor-bord-prompt.md` en `docs/miro-interview-prompt.md`.
 - **Klant-data, echte audit-output.** `examples/` bevat alleen
   geanonimiseerde fixtures. Echte audit-rapporten en `.db`-bestanden zijn
   via `.gitignore` uitgesloten.

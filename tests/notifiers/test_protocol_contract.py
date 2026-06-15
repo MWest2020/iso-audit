@@ -10,6 +10,11 @@ from __future__ import annotations
 
 import pytest
 
+# Trigger import van bundled notifier-adapters zodat hun `@register`-decorator
+# wordt geëvalueerd vóór `_registered_notifiers()` parametrize-tijd wordt
+# aangeroepen — anders blijven de parametrized contract-tests leeg.
+import iso_audit.notifiers.email
+import iso_audit.notifiers.slack  # noqa: F401
 from iso_audit import notifiers
 from iso_audit.modes.base import Decision
 from iso_audit.notifiers.base import DecisionResolver, Notifier
@@ -147,6 +152,12 @@ def test_notifier_implements_protocol_runtime(naam: str, notifier_class: type[No
 
 
 @pytest.mark.contract
-def test_registry_is_empty_in_milestone_a() -> None:
-    """In milestone A nog geen notifiers geregistreerd. Verdwijnt in milestone C."""
-    assert notifiers.available() == []
+def test_registry_bevat_minstens_slack_en_email() -> None:
+    """In milestone C zijn Slack + Email geregistreerd via `@register`."""
+    # Trigger import zodat de decorators draaien (vergelijkbaar met sources).
+    import iso_audit.notifiers.email
+    import iso_audit.notifiers.slack  # noqa: F401
+
+    beschikbaar = notifiers.available()
+    assert "slack" in beschikbaar
+    assert "email" in beschikbaar

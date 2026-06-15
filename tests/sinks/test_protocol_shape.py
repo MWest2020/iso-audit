@@ -80,6 +80,8 @@ def test_register_adds_to_registry(lege_registries: None) -> None:
     assert sinks.get("drive-stub") is _DriveSinkStub
 
 
-def test_registry_is_empty_in_milestone_a() -> None:
-    """In milestone A nog geen sinks geregistreerd. DriveSink komt in milestone C."""
-    assert sinks.available() == []
+def test_registry_bevat_minstens_drive() -> None:
+    """In milestone C is DriveSink geregistreerd via `@register`."""
+    import iso_audit.sinks.drive  # noqa: F401
+
+    assert "drive" in sinks.available()

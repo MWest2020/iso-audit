@@ -1,9 +1,9 @@
 # iso-audit — Architectuur
 
-> Status: milestone A skeleton. De pipeline-runtime, classifier-keten en
-> rapport-generator komen in milestone B; modes en notifiers in milestone C.
-> Dit document beschrijft het eindplaatje en markeert wat nu wel/nog niet
-> gerealiseerd is.
+> Status: milestones A + B + C-§3.1-3.5 gemerged. Resterend werk: eerste
+> integer-run als M-C §3.6 acceptatie en `v1.0.0`-tag (§3.8). Dit document
+> beschrijft het eindplaatje; de M-A/M-B/M-C labels in de protocol-secties
+> hieronder markeren in welke milestone elke module is geland (provenance).
 
 ## Drie protocol-lagen, één pipeline
 
@@ -68,8 +68,9 @@ programmeerfout, geen silent-overschrijving.
 
 ## Sink Protocol (`iso_audit.sinks.base`)
 
-Spec-only in milestone A. Eerste implementatie (`DriveSink`) consolideert
-de rapport-publicatie-paden in milestone C.
+`DriveSink` is de eerste implementatie (milestone C §3.3.1). Doorgeleiding
+van bestaande reporting-write-paden via `Sink.send()` is DEFERRED tot na
+de eerste integer-run (zie CHANGELOG 2026-05-14).
 
 ```python
 class Sink(Protocol):
@@ -83,7 +84,7 @@ Payload-hierarchy: `ReportPayload`, `NotificationPayload`, `MirrorPayload`
 
 Asymmetrie t.o.v. Source is bewust: Source enumereert + fetcht, Sink
 levert one-shot. Symmetrie afdwingen voegt complexiteit toe zonder
-use-case (zie `openspec/changes/iso-refactor/design.md` decision 2).
+use-case.
 
 ## Notifier Protocol (`iso_audit.notifiers.base`)
 
@@ -113,9 +114,8 @@ draaien.
 
 ## Modes Protocol (`iso_audit.modes.base`)
 
-In milestone A bestaat alleen de `Decision` dataclass + Mode Protocol-stub.
-Volledige `AutonoomMode` en `IntegerMode` komen in milestone C met zeven
-beslispunten:
+`AutonoomMode` en `IntegerMode` zijn beide gerealiseerd in milestone C
+met zeven beslispunten:
 
 | Punt | Risico | Autonoom | Integer |
 |---|---|---|---|
@@ -127,9 +127,7 @@ beslispunten:
 | `send_report` | hoog | direct verzenden via Sink | sign-off vereist via Notifier |
 | `delete_data` | hoog | nooit autonoom | mens-bevestigd via Notifier |
 
-Volledige uitwerking + alternatieven: zie
-[`openspec/changes/iso-refactor/design.md`](openspec/changes/iso-refactor/design.md)
-decision 3.
+Volledige uitwerking per beslispunt: zie [`docs/modes.md`](docs/modes.md).
 
 ## Gegevensopslag
 
@@ -145,7 +143,7 @@ grijpen:
   `(punt, resolved_at)`. Append-only — pipeline overschrijft nooit
   resolved/cancelled rijen. Capability-3-data.
 
-## Pipeline-orchestratie (vooruitkijkend, milestone B/C)
+## Pipeline-orchestratie
 
 ```
 1. CLI arg-parse        →   --source <verplicht>, --mode <verplicht>,
@@ -200,8 +198,8 @@ unit-files zijn auditable.
 
 - **[`docs/missie.md`](docs/missie.md)** — waarom dit tool bestaat en
   welke design-criteria daaruit voortkomen.
-- **[`openspec/changes/iso-refactor/`](openspec/changes/iso-refactor/)** —
-  proposal, design, specs, tasks voor de huidige refactor.
+- **[`MEMORY.md`](MEMORY.md)** — handoff-snapshot: huidige milestone-
+  status, resterend werk, blocked items.
 - **[`docs/sources/`](docs/sources/)**, **[`docs/notifiers/`](docs/notifiers/)**,
   **[`docs/sinks/`](docs/sinks/)**, **[`docs/modes.md`](docs/modes.md)** —
   per-laag uitwerking en setup-instructies.

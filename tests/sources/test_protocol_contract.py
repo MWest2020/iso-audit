@@ -18,6 +18,12 @@ from typing import Any
 
 import pytest
 
+# Trigger imports van bundled source-adapters vóór `_registered_sources()`
+# parametrize-tijd wordt aangeroepen — anders blijven de parametrized
+# contract-tests leeg.
+import iso_audit.sources.drive
+import iso_audit.sources.jira
+import iso_audit.sources.planning  # noqa: F401
 from iso_audit import sources
 from iso_audit.sources.base import Document, Finding, Source
 
@@ -183,8 +189,10 @@ def test_adapter_implements_protocol_runtime(naam: str, adapter_class: type[Sour
 
 
 @pytest.mark.contract
-def test_registry_is_empty_in_milestone_a() -> None:
-    """In milestone A zijn er nog geen adapters geregistreerd. Deze test
-    verdwijnt in milestone B zodra DriveSource registreert; tot die tijd
-    documenteert hij de huidige toestand."""
-    assert sources.available() == []
+def test_registry_bevat_minstens_drive() -> None:
+    """Vanaf milestone B §2.3.2 is `DriveSource` als basis-adapter geregistreerd.
+
+    Vervangt de oude milestone-A-test (lege registry); auto-discovery van
+    adapters via module-import is een werkende invariant van het systeem.
+    """
+    assert "drive" in sources.available()

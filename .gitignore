@@ -35,3 +35,11 @@ output/
 .env
 .env.local
 .env.*.local
+
+# Secrets / credentials — never commit
+*.pem
+*.key
+*_rsa
+*.crt
+*.p12
+*.pfx

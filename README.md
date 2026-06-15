@@ -1,7 +1,9 @@
 # iso-audit
 
-> **Status:** milestone A skeleton (alpha). Pipeline-runtime, classifier en
-> rapport-generator komen in milestone B; modes en notifiers in milestone C.
+> **Status:** milestone A + B + grootste deel C gemerged. Drie sources
+> (Drive, Planning, Jira), één Sink (Drive), twee Notifiers (Slack, Email)
+> en beide modes (autonoom, integer) draaien. Resterend werk: eerste
+> end-to-end integer-run als M-C §3.6 acceptatie, daarna `v1.0.0`-tag.
 
 Pluggable ISO 9001 + 27001 audit-pipeline met drie protocol-lagen
 (sources, sinks, notifiers) en twee runmodes (autonoom, integer).
@@ -15,8 +17,10 @@ uv sync --dev
 uv run iso-audit --help
 ```
 
-In milestone A toont `iso-audit --help` alleen de stub-CLI; subcommands
-(`pipeline`, `doctor`, `setup-template`) komen in milestone B.
+De CLI biedt `pipeline`, `doctor` en `setup-template` subcommands. Drie
+verplichte flags: `--source`, `--mode`, en (bij `--mode integer`)
+`--notifier`. Env-var-fallback voor cron — zie ARCHITECTURE.md
+§"Configuratie".
 
 ## Architectuur
 
@@ -27,11 +31,12 @@ sources/  →  pipeline  →  modes  →  notifiers (integer)
 ```
 
 Volledig plaatje in **[`ARCHITECTURE.md`](ARCHITECTURE.md)**. Het waarom
-in **[`docs/missie.md`](docs/missie.md)**. De roadmap in
-**[`openspec/changes/iso-refactor/`](openspec/changes/iso-refactor/)**.
+in **[`docs/missie.md`](docs/missie.md)**. Sessie-status en volgende-
+stap in **[`MEMORY.md`](MEMORY.md)**.
 
 ## Documentatie
 
+- **[`ONBOARDING.md`](ONBOARDING.md)** — van nul naar productief; waar staat wat, hoe voeg je een adapter toe
 - **[`docs/missie.md`](docs/missie.md)** — drie capabilities en het rolconflict-frame
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — protocol-lagen, registries, pipeline-flow
 - **[`docs/sources/`](docs/sources/)** — per bron-adapter (drive, planning, jira, mcp, rest)

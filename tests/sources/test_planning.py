@@ -1,0 +1,360 @@
+"""Tests voor `iso_audit.sources.planning` — PlanningSource + parsing."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+from unittest.mock import patch
+
+import pytest
+
+from iso_audit import store
+from iso_audit.sources import planning
+from iso_audit.sources.base import Document
+
+
+@pytest.fixture(autouse=True)
+def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(planning.PLANNING_SHEETS_ID_ENV, raising=False)
+
+
+# ---------- _norm_uit_tabnaam ----------
+
+
+@pytest.mark.parametrize(
+    "tab, norm",
+    [
+        ("9001:2015 2025", "9001"),
+        ("ISO 27001 2026", "27001"),
+        ("Auditplanning 2025", "beide"),
+    ],
+)
+def test_norm_uit_tabnaam(tab: str, norm: str) -> None:
+    assert planning._norm_uit_tabnaam(tab) == norm
+
+
+# ---------- _jaar_uit_tabnaam ----------
+
+
+def test_jaar_uit_tabnaam_laatste_match() -> None:
+    """Bij meerdere jaren wint de laatste — '9001:2015 2025' → 2025."""
+    assert planning._jaar_uit_tabnaam("9001:2015 2025") == 2025
+
+
+def test_jaar_uit_tabnaam_zonder_jaar() -> None:
+    assert planning._jaar_uit_tabnaam("Auditplanning") is None
+
+
+# ---------- _normaliseer_clausule ----------
+
+
+@pytest.mark.parametrize(
+    "raw, verwacht",
+    [
+        ("4.4.1", "4.4"),
+        ("5.1.2", "5.1"),
+        ("4.1 Organisatiecontext", "4.1"),
+        ("nope", None),
+        ("", None),
+    ],
+)
+def test_normaliseer_clausule(raw: str, verwacht: str | None) -> None:
+    assert planning._normaliseer_clausule(raw) == verwacht
+
+
+# ---------- _detecteer_maandkolommen ----------
+
+
+def test_detecteer_maandkolommen() -> None:
+    rijen = [
+        ["Header A", "Header B"],
+        ["", "Clausule", "januari", "februari", "maart"],
+        ["", "4.1", "x", "", ""],
+    ]
+    idx, cols = planning._detecteer_maandkolommen(rijen)
+    assert idx == 1
+    assert cols == {2: "januari", 3: "februari", 4: "maart"}
+
+
+def test_detecteer_maandkolommen_geen_match() -> None:
+    rijen = [["Geen", "maand", "namen", "hier"]]
+    idx, cols = planning._detecteer_maandkolommen(rijen)
+    assert idx == -1
+    assert cols == {}
+
+
+# ---------- _parse_tab ----------
+
+
+def test_parse_tab_basis() -> None:
+    rijen = [
+        ["", "", "", "", ""],
+        ["", "Clausule", "januari", "februari", "Notitie"],
+        ["", "4.1", "x", "", "Context analyse"],
+        ["", "5.1", "", "x", "Leiderschap"],
+    ]
+    rows = planning._parse_tab("9001:2015 2025", rijen)
+    assert len(rows) == 2
+    assert rows[0].clausule_id == "4.1"
+    assert rows[0].norm == "9001"
+    assert rows[0].jaar == 2025
+    assert rows[0].gepland_maanden == ["januari"]
+    assert rows[0].status == "gepland"
+    assert rows[0].kwartaal == "januari"
+
+
+def test_parse_tab_zonder_planning_x() -> None:
+    """Clausule zonder x-markering → status = 'open'."""
+    rijen = [
+        ["", "Clausule", "januari"],
+        ["", "10.2", ""],
+    ]
+    rows = planning._parse_tab("27001 2026", rijen)
+    assert rows[0].status == "open"
+    assert rows[0].gepland_maanden == []
+
+
+def test_parse_tab_leeg() -> None:
+    assert planning._parse_tab("Tab", []) == []
+    assert planning._parse_tab("Tab", [["alleen header"]]) == []
+
+
+def test_parse_tab_zonder_maandkolom() -> None:
+    rijen = [
+        ["", "Clausule", "geen-maand-hier"],
+        ["", "4.1", "x"],
+    ]
+    assert planning._parse_tab("Tab", rijen) == []
+
+
+def test_parse_tab_skipt_ongeldige_clausule() -> None:
+    rijen = [
+        ["", "Clausule", "januari"],
+        ["", "geen nummer", "x"],
+        ["", "4.1", "x"],
+    ]
+    rows = planning._parse_tab("9001 2025", rijen)
+    assert [r.clausule_id for r in rows] == ["4.1"]
+
+
+# ---------- PlanningSource ----------
+
+
+def test_planningsource_default_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(planning.PLANNING_SHEETS_ID_ENV, raising=False)
+    src = planning.PlanningSource()
+    assert src.spreadsheet_id == planning.DEFAULT_PLANNING_SHEETS_ID
+
+
+def test_planningsource_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(planning.PLANNING_SHEETS_ID_ENV, "env-sid")
+    src = planning.PlanningSource()
+    assert src.spreadsheet_id == "env-sid"
+
+
+def test_planningsource_expliciete_id_wint() -> None:
+    src = planning.PlanningSource(spreadsheet_id="custom-sid")
+    assert src.spreadsheet_id == "custom-sid"
+
+
+def test_planningsource_geregistreerd() -> None:
+    from iso_audit.sources import available, get
+
+    assert "planning" in available()
+    assert get("planning") is planning.PlanningSource
+
+
+def test_planningsource_list_documents() -> None:
+    tabs = {
+        "9001 2025": [
+            ["", "Clausule", "januari", "februari", "Notitie"],
+            ["", "4.1", "x", "", "Ctxt"],
+        ]
+    }
+    src = planning.PlanningSource(spreadsheet_id="x")
+    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+        docs = list(src.list_documents())
+    assert len(docs) == 1
+    d = docs[0]
+    assert d.bron == "planning"
+    assert d.type == "audit-planning"
+    assert d.id == "9001:4.1:2025"
+    assert "4.1" in d.titel
+
+
+def test_planningsource_fetch_content() -> None:
+    tabs = {
+        "9001 2025": [
+            ["", "Clausule", "januari", "februari", "Notitie"],
+            ["", "4.1", "x", "", "Context analyse"],
+        ]
+    }
+    src = planning.PlanningSource(spreadsheet_id="x")
+    doc = Document(
+        id="9001:4.1:2025",
+        titel="t",
+        bron="planning",
+        type="audit-planning",
+        laatst_gewijzigd="",
+        inhoud_uri="9001 2025",
+    )
+    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+        content = src.fetch_content(doc)
+    assert "Status: gepland" in content
+    assert "januari" in content
+    assert "Context analyse" in content
+
+
+def test_planningsource_fetch_content_andere_bron() -> None:
+    src = planning.PlanningSource(spreadsheet_id="x")
+    doc = Document(
+        id="x:y:z",
+        titel="t",
+        bron="drive",
+        type="audit-planning",
+        laatst_gewijzigd="",
+        inhoud_uri="",
+    )
+    with pytest.raises(ValueError, match="PlanningSource"):
+        src.fetch_content(doc)
+
+
+def test_planningsource_fetch_content_ongeldige_id() -> None:
+    src = planning.PlanningSource(spreadsheet_id="x")
+    doc = Document(
+        id="kapotte-id",
+        titel="t",
+        bron="planning",
+        type="audit-planning",
+        laatst_gewijzigd="",
+        inhoud_uri="",
+    )
+    with pytest.raises(ValueError, match="Invalide PlanningSource"):
+        src.fetch_content(doc)
+
+
+def test_planningsource_list_findings_leeg() -> None:
+    src = planning.PlanningSource(spreadsheet_id="x")
+    assert list(src.list_findings("sessie-1")) == []
+
+
+def test_planningsource_healthcheck_ok() -> None:
+    src = planning.PlanningSource(spreadsheet_id="x")
+    with patch.object(planning, "gws_lees_alle_tabs", return_value={"t1": []}):
+        h = src.healthcheck()
+    assert h["status"] == "ok"
+    assert h["aantal_tabs"] == 1
+
+
+def test_planningsource_healthcheck_fail() -> None:
+    src = planning.PlanningSource(spreadsheet_id="x")
+    with patch.object(planning, "gws_lees_alle_tabs", side_effect=RuntimeError("auth fail")):
+        h = src.healthcheck()
+    assert h["status"] == "fail"
+    assert "auth fail" in str(h["reden"])
+
+
+# ---------- run (legacy CLI) ----------
+
+
+@pytest.fixture
+def db_pad(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    pad = tmp_path / "audit.db"
+    monkeypatch.setenv("AUDIT_DB_PATH", str(pad))
+    return str(pad)
+
+
+def test_run_droog_doet_geen_db_mutatie(db_pad: str, capsys: pytest.CaptureFixture[str]) -> None:
+    tabs = {
+        "9001 2025": [
+            ["", "Clausule", "januari", "februari", "Notitie"],
+            ["", "4.1", "x", "", "Ctxt"],
+        ]
+    }
+    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+        planning.run(droog=True, spreadsheet_id="x")
+    out = capsys.readouterr().out
+    assert "4.1" in out
+
+    # DB is leeg.
+    conn = store.verbinding(db_pad)
+    try:
+        rows = conn.execute("SELECT * FROM audit_planning").fetchall()
+    except Exception:  # tabel mogelijk niet aangemaakt in dry-run? — controleer
+        rows = []
+    finally:
+        conn.close()
+    # In dry-run wordt _initialiseer_planning_tabel WEL aangeroepen (commit
+    # gebeurt al daar), maar er worden geen rijen toegevoegd.
+    assert rows == []
+
+
+def test_run_persisteert_planning(db_pad: str) -> None:
+    tabs = {
+        "9001 2025": [
+            ["", "Clausule", "januari", "februari", "Notitie"],
+            ["", "4.1", "x", "", "Ctxt"],
+            ["", "5.1", "", "x", "Leider"],
+        ]
+    }
+    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+        planning.run(droog=False, spreadsheet_id="x")
+
+    conn = store.verbinding(db_pad)
+    rows = conn.execute(
+        "SELECT clausule_id, norm, jaar, kwartaal, status FROM audit_planning ORDER BY clausule_id"
+    ).fetchall()
+    conn.close()
+    assert len(rows) == 2
+    assert rows[0]["clausule_id"] == "4.1"
+    assert rows[0]["norm"] == "9001"
+    assert rows[0]["jaar"] == 2025
+    assert rows[0]["kwartaal"] == "januari"
+    assert rows[0]["status"] == "gepland"
+
+
+# ---------- gws_lees_alle_tabs/gws_lees_sheet (clients.gws extension) ----------
+
+
+def test_gws_lees_sheet_uses_default_range() -> None:
+    """`bereik=None` → default `A1:ZZ10000`."""
+    from iso_audit.clients import gws
+
+    with patch.object(gws, "_gws", return_value={"values": [["x"]]}) as mock:
+        out = gws.gws_lees_sheet("sid")
+    assert out == [["x"]]
+    params = mock.call_args.kwargs["params"]
+    assert params["range"] == "A1:ZZ10000"
+
+
+def test_gws_lees_alle_tabs_combineert_tabs() -> None:
+    from iso_audit.clients import gws
+
+    meta = {"sheets": [{"properties": {"title": "Tab1"}}, {"properties": {"title": "Tab2"}}]}
+    sheet_responses: list[Any] = [meta, {"values": [["a"]]}, {"values": [["b"]]}]
+    with patch.object(gws, "_gws", side_effect=sheet_responses):
+        out = gws.gws_lees_alle_tabs("sid")
+    assert set(out.keys()) == {"Tab1", "Tab2"}
+    assert out["Tab1"] == [["a"]]
+
+
+def test_gws_lees_alle_tabs_skipt_falende_tab() -> None:
+    """Een tab die error gooit wordt overgeslagen, niet propaged."""
+    from iso_audit.clients import gws
+
+    meta = {"sheets": [{"properties": {"title": "Tab1"}}, {"properties": {"title": "Tab2"}}]}
+
+    def fake_gws(*args: str, **kwargs: Any) -> dict[str, Any]:
+        # Eerste call = meta-fetch.
+        if "get" in args and "values" not in args:
+            return meta
+        # Tab2-fetch raised.
+        params = kwargs.get("params", {})
+        if "Tab2" in params.get("range", ""):
+            raise RuntimeError("Tab fout")
+        return {"values": [["a"]]}
+
+    with patch.object(gws, "_gws", side_effect=fake_gws):
+        out = gws.gws_lees_alle_tabs("sid")
+    assert "Tab1" in out
+    assert "Tab2" not in out

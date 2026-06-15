@@ -1,8 +1,12 @@
 """Sink-adapters: pluggable schrijf-paden voor de audit-pipeline.
 
-Spec-only in milestone A; eerste implementatie (DriveSink) in milestone C.
-Het registry-patroon is identiek aan ``iso_audit.sources`` voor uitlegbaarheid
-aan externe code-reviewers.
+Eerste implementatie: :class:`iso_audit.sinks.drive.DriveSink`. Het
+registry-patroon is identiek aan ``iso_audit.sources`` en
+``iso_audit.notifiers`` voor uitlegbaarheid aan externe code-reviewers.
+
+Een nieuwe Sink toevoegen: zie ``ONBOARDING.md`` (sectie "Een adapter
+toevoegen"). Kort: erf van :class:`~iso_audit.sinks.base.Sink`, geef een
+class-level ``naam``-attribute, en decoreer met ``@register``.
 """
 
 from __future__ import annotations

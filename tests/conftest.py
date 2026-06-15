@@ -80,8 +80,14 @@ def sample_decision() -> Decision:
 def lege_registries() -> Iterator[None]:
     """Reset alle protocol-registries vóór en ná elke test die deze fixture gebruikt.
 
-    Voorkomt dat tests elkaar besmetten via globale registry-state.
+    Voorkomt dat tests elkaar besmetten via globale registry-state. Na de
+    test worden de bundled adapters opnieuw geregistreerd door hun modules
+    te re-importeren — anders zou daarop-volgend testorder breken voor
+    tests die `available()`/`get()` direct gebruiken.
     """
+    import importlib
+    import sys
+
     from iso_audit.notifiers import _reset_for_tests as _reset_notifiers
     from iso_audit.sinks import _reset_for_tests as _reset_sinks
     from iso_audit.sources import _reset_for_tests as _reset_sources
@@ -93,3 +99,24 @@ def lege_registries() -> Iterator[None]:
     _reset_sources()
     _reset_sinks()
     _reset_notifiers()
+
+    # Re-registreer bundled adapters. Als de module al in sys.modules zit,
+    # `reload()` om de @register-decorator opnieuw te triggeren. Anders
+    # `import_module()` — dat voert het module-script éénmaal uit.
+    # `reload()` na vers `import_module()` zou de decorator twee keer
+    # uitvoeren en in dubbele-registratie eindigen.
+    for mod_naam in (
+        "iso_audit.sources.drive",
+        "iso_audit.sources.planning",
+        "iso_audit.sources.jira",
+        "iso_audit.notifiers.slack",
+        "iso_audit.notifiers.email",
+        "iso_audit.sinks.drive",
+    ):
+        try:
+            if mod_naam in sys.modules:
+                importlib.reload(sys.modules[mod_naam])
+            else:
+                importlib.import_module(mod_naam)
+        except ImportError:
+            continue
