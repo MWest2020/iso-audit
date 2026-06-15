@@ -94,6 +94,28 @@ def test_render_html_escaped_geen_placeholder_voor_ingevulde_cel() -> None:
     assert "2026-Q3" in html  # ingevulde uiterlijk-cel, geen placeholder
 
 
+def _memo_met_nc(triage: str, reasoning: list[str]) -> AuditMemo:
+    m = _memo()
+    m.nc_blocks[0].triage_status = triage  # type: ignore[assignment]
+    m.nc_blocks[0].reasoning = reasoning
+    return m
+
+
+def test_triage_checklist_voor_kandidaat() -> None:
+    html = MemoRendererImpl().render_html(
+        _memo_met_nc("te_verifieren", ["ruwe bevinding A", "ruwe bevinding B"]), _profiel()
+    )
+    assert 'class="triage"' in html
+    assert "☑ te verifiëren" in html
+    assert "Waarop gebaseerd" in html
+    assert "ruwe bevinding A" in html
+
+
+def test_geen_triage_voor_valide_nc() -> None:
+    html = MemoRendererImpl().render_html(_memo_met_nc("valide", []), _profiel())
+    assert 'class="triage"' not in html
+
+
 def test_font_stack_niet_html_escaped_in_css() -> None:
     """Regressie: autoescape mag de quotes in de font-stack niet kapotmaken (CSS-context)."""
     html = MemoRendererImpl().render_html(_memo(), _profiel())

@@ -2,6 +2,7 @@
   {
     "id": "nc-1",
     "severity": "NC",
+    "triage_status": "valide",
     "standard": "iso-9001-2015",
     "clause": "10.2",
     "title": "NC 1 — Opvolging en effectiviteits-evaluatie afwijkingen-/incidentmemo's",
@@ -16,6 +17,7 @@
   {
     "id": "nc-2",
     "severity": "NC",
+    "triage_status": "valide",
     "standard": "iso-27001-2022",
     "clause": "6.5",
     "extra_clauses": ["5.11", "5.18"],

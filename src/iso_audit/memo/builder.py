@@ -46,6 +46,8 @@ def _nc_block(
         pattern_note=detector.pattern_note(f.clause, findings),
         corrective_measure=f.corrective_measure or "(corrigerende maatregel in te vullen)",
         actions=f.actions or [ActionRow(wat="(actie in te vullen)")],
+        reasoning=f.reasoning,
+        triage_status=f.triage_status,
     )
 
 
