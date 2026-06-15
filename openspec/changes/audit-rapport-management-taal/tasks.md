@@ -8,17 +8,22 @@
 
 ## Code-wijzigingen
 
-- [ ] `audit/report_generation.py` — `_management_summary_prompt` herschrijven (auditor-frame, SMART-blokken, jargon-vertaal-instructie, bridging-regel, verboden woorden)
-- [ ] `audit/report_generation.py` — `_top3_aanbevelingen` herschrijven naar positieve template; verboden NC-woorden uitfilteren of expliciet niet meegeven aan LLM
-- [ ] `audit/local_report.py` — sectie 3 (Bevindingen) krijgt aan het begin een OFI-uitlegblok + top-5 thema-aggregatie­tabel
-- [ ] `audit/pipeline.py` — handmatige "lead-auditor aanbeveling"-sectie controleren op verboden woorden en herformuleren
-- [ ] `audit/pipeline.py` — `--report-only` flag toevoegen die bevindingen uit bestaande DB laadt en alleen rapport regenereert
+> Paden gecorrigeerd na verhuizing uit `Ops_to_Biz`: `audit/` → `src/iso_audit/`.
+> Ontwerpbesluit (2026-06-15): SMART-blokken staan in §3 Aanbevelingen, niet in
+> de summary zelf (summary blijft kort, verwijst naar §3). Redactionele regels
+> staan in versie-prompts `src/iso_audit/reporting/prompts/*.md`, niet in code.
+
+- [x] `src/iso_audit/reporting/report_generation.py` — `_management_summary_prompt` herschreven: redactie naar `prompts/management_summary_v1.md` (auditor-frame, jargon-vertaal-instructie, bridging-regel), feiten blijven in code
+- [x] `src/iso_audit/reporting/report_generation.py` — `_top3_aanbevelingen` als deterministische input-builder + nieuwe `_genereer_aanbevelingen` (SMART/positieve template via `prompts/aanbevelingen_v1.md`) + `_check_verboden_woorden`-gate op de output
+- [ ] `src/iso_audit/reporting/local_report.py` — sectie 3 (Bevindingen) krijgt aan het begin een OFI-uitlegblok + top-5 thema-aggregatie­tabel
+- [ ] `src/iso_audit/pipeline.py` — handmatige "lead-auditor aanbeveling"-sectie controleren op verboden woorden en herformuleren
+- [ ] `src/iso_audit/pipeline.py` — `--report-only` flag toevoegen die bevindingen uit bestaande DB laadt en alleen rapport regenereert
 
 ## Validatie
 
 - [ ] Dry-run met `--report-only` op bestaande s05 DB (output/audit_s10.db)
 - [ ] Diff tussen oude en nieuwe management-summary visueel reviewen
-- [ ] Verboden-woorden-check geautomatiseerd: regex over gegenereerd rapport, faalt op "onvoldoende|ontoereikend|risico|lacune|gebrek|ontbreekt" binnen aanbevelingen-sectie
+- [x] Verboden-woorden-check geautomatiseerd: `_check_verboden_woorden` (woordgrens-regex) over de aanbevelingen-sectie + unit-tests (schoon/vuil/samenstelling). Logt waarschuwing bij hit i.p.v. crashen (boring & auditable)
 - [ ] Marianne-akkoord op output vóór archivering van deze change
 
 ## Documentatie

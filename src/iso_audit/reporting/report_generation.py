@@ -14,6 +14,7 @@ import os
 import re
 from collections import Counter, defaultdict
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import anthropic
@@ -24,6 +25,81 @@ logger = logging.getLogger(__name__)
 
 VOLGORDE: dict[str, int] = {"NC": 0, "OFI": 1, "positief": 2}
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+
+# Near-idempotentie: lage temperatuur → stabiele, reproduceerbare output bij
+# herdraaien (bv. via --report-only). Zie memory "architectuur-harness-fundament".
+CLAUDE_TEMPERATUUR = 0.0
+
+# Redactionele LLM-regels staan versiegestuurd in prompts/<naam>_v<n>.md,
+# niet hardcoded in code. Zie memory "prompts-versiegestuurd-niet-hardcoded".
+_PROMPT_DIR = Path(__file__).parent / "prompts"
+
+# Deterministische gate: deze NC-woorden mogen niet in de aanbevelingen-sectie.
+# De LLM-prompt vraagt het; _check_verboden_woorden bevestigt het op de output.
+_VERBODEN_WOORDEN: tuple[str, ...] = (
+    "onvoldoende",
+    "ontoereikend",
+    "risico",
+    "lacune",
+    "gebrek",
+    "ontbreekt",
+)
+
+
+def _laad_prompt(naam: str, vervangingen: dict[str, str]) -> str:
+    """Laad een versie-prompt uit ``prompts/`` en vul ``{{placeholders}}`` in.
+
+    Code levert alleen de feiten (cijfers/clusters) via ``vervangingen``; de
+    redactie staat in het ``.md``-bestand. Faalt luid bij een niet-ingevulde
+    placeholder — een stille gap in een auditrapport is erger dan een crash.
+    """
+    tekst = (_PROMPT_DIR / f"{naam}.md").read_text(encoding="utf-8")
+    # Strip HTML-commentaar (de redacteur-notitie bovenaan het bestand).
+    tekst = re.sub(r"<!--.*?-->\n?", "", tekst, flags=re.DOTALL)
+    for sleutel, waarde in vervangingen.items():
+        tekst = tekst.replace(f"{{{{{sleutel}}}}}", waarde)
+    overgebleven = re.findall(r"\{\{(\w+)\}\}", tekst)
+    if overgebleven:
+        raise ValueError(
+            f"Prompt {naam!r}: niet-ingevulde placeholder(s) {sorted(set(overgebleven))}"
+        )
+    return tekst.strip()
+
+
+def _check_verboden_woorden(tekst: str, sectie: str = "aanbevelingen") -> list[str]:
+    """Deterministische gate: zoek verboden NC-woorden in een gegenereerde sectie.
+
+    Returnt de gevonden woorden (leeg = schoon) en logt één waarschuwing als er
+    hits zijn. Dit is de auditeerbare garantie achter de aanbevelingen-prompt —
+    zie spec report-generation, requirement 'Aanbevelingen-template zonder
+    NC-woorden'. Matcht op woordgrens, dus legitieme samenstellingen als
+    'risicobeoordeling' worden niet gevlagd; losse 'risico'('s) wel.
+    """
+    laag = tekst.lower()
+    gevonden = sorted({w for w in _VERBODEN_WOORDEN if re.search(rf"\b{re.escape(w)}\b", laag)})
+    if gevonden:
+        logger.warning(
+            "Verboden woord(en) in %s-sectie: %s — herformuleer naar de gewenste "
+            "eindsituatie (actie → resultaat), niet de tekortkoming.",
+            sectie,
+            ", ".join(gevonden),
+        )
+    return gevonden
+
+
+def _format_top(bevindingen: list[dict[str, Any]], teller: Counter[str], n: int = 5) -> str:
+    """Top-N clusters per clausule met tot 3 voorbeelddocumenten."""
+    regels: list[str] = []
+    for clausule, aantal in teller.most_common(n):
+        voorbeelden = [
+            b["document_naam"]
+            for b in bevindingen
+            if b["clausule"] == clausule and b["classificatie"] in ("NC", "OFI")
+        ][:3]
+        voorbeeld_tekst = "; ".join(v[:60] for v in voorbeelden) if voorbeelden else "(geen)"
+        regels.append(f"- {clausule} ({aantal}x): voorbeelddocs: {voorbeeld_tekst}")
+    return "\n".join(regels) if regels else "(geen)"
+
 
 _MANAGEMENT_CONTEXT = """\
 Organisatiecontext Conduction:
@@ -56,7 +132,7 @@ def _oordeel_instructie(nc_count: int) -> str:
 
 
 def _management_summary_prompt(bevindingen: list[dict[str, Any]]) -> str:
-    """Bouw de prompt voor een feiten-gedreven management summary."""
+    """Bouw de management-summary-prompt: feiten in code, redactie uit versie-prompt."""
     nc_count = sum(1 for b in bevindingen if b["classificatie"] == "NC")
     ofi_count = sum(1 for b in bevindingen if b["classificatie"] == "OFI")
     pos_count = sum(1 for b in bevindingen if b["classificatie"] == "positief")
@@ -82,60 +158,19 @@ def _management_summary_prompt(bevindingen: list[dict[str, Any]]) -> str:
         else ""
     )
 
-    def _format_top(teller: Counter[str], n: int = 5) -> str:
-        regels: list[str] = []
-        for clausule, aantal in teller.most_common(n):
-            voorbeelden = [
-                b["document_naam"]
-                for b in bevindingen
-                if b["clausule"] == clausule and b["classificatie"] in ("NC", "OFI")
-            ][:3]
-            voorbeeld_tekst = "; ".join(v[:60] for v in voorbeelden) if voorbeelden else "(geen)"
-            regels.append(f"- {clausule} ({aantal}x): voorbeelddocs: {voorbeeld_tekst}")
-        return "\n".join(regels) if regels else "(geen)"
-
-    top_nc_tekst = _format_top(nc_per_clausule, n=8)
-    top_ofi_tekst = _format_top(ofi_per_clausule, n=5)
-    top_pos_tekst = _format_top(pos_per_clausule, n=5)
-
-    return (
-        "Schrijf een Nederlandstalige management summary (max 200 woorden) "
-        "voor een interne ISO 9001/27001 audit. Doel: feitelijke samenvatting "
-        "in zakelijke auditor-taal. KORT — de geprioriteerde acties staan in "
-        "een aparte §3 Aanbevelingen-tabel die hierna in het rapport komt.\n\n"
-        f"{_MANAGEMENT_CONTEXT}\n"
-        "WAT JE WEL DOET:\n"
-        "- 1 alinea intro: scope + totaalcijfers.\n"
-        "- 1 alinea: in WELKE thema's de verbetergebieden zitten (kort, "
-        "max 2 zinnen) — verwijs voor de details + acties naar §3.\n"
-        "- 1 alinea: positieve bevindingen kort erkennen, concreet.\n"
-        "- 1 zin: bridging als gemengde clusters bestaan (zie hieronder).\n"
-        "- 1 zin: oordeel ('voldoende' / 'onvoldoende').\n\n"
-        "WAT JE NIET DOET:\n"
-        "- GEEN aparte paragrafen per verbetergebied — die staan in §3.\n"
-        "- GEEN eigenaars, deadlines, RACI, weekplanning, uurschattingen.\n"
-        "- GEEN voorbeeldrijen voor registers/matrices.\n"
-        "- GEEN aanbevelingen ('doe X om Y').\n"
-        "- GEEN risicotaxatie van uitstel.\n"
-        "- GEEN verzonnen leveranciersnamen of personen.\n\n"
-        f"{bridging_eis}"
-        "Resultaatoverzicht:\n"
-        f"- Non-conformiteiten (NC): {nc_count}\n"
-        f"- Kansen voor verbetering (OFI): {ofi_count}\n"
-        f"- Positieve bevindingen: {pos_count}\n\n"
-        f"NC-clusters per clausule:\n{top_nc_tekst}\n\n"
-        f"OFI-clusters per clausule (top 5):\n{top_ofi_tekst}\n\n"
-        f"Positieve clusters per clausule (top 5):\n{top_pos_tekst}\n\n"
-        "STRUCTUUR (volg precies):\n"
-        "1. Intro (1 alinea): scope + totaalcijfers.\n"
-        "2. Verbetergebieden in 1 alinea, max 2 zinnen: 'De auditor heeft "
-        "X thema's vastgesteld waar verbetering nodig is — voor de "
-        "geprioriteerde acties zie §3 Aanbevelingen.'\n"
-        "3. Positieve bevindingen (1 alinea, concreet, geen loftrompet).\n"
-        "4. Bridging-zin als gemengde clusters bestaan.\n"
-        "5. Oordeel (1 zin) — STRIKT volgens dit sjabloon:\n"
-        f"   {_oordeel_zin(nc_count)}\n\n"
-        "Schrijf alleen platte tekst, geen markdown-headers."
+    return _laad_prompt(
+        "management_summary_v1",
+        {
+            "management_context": _MANAGEMENT_CONTEXT,
+            "nc_count": str(nc_count),
+            "ofi_count": str(ofi_count),
+            "pos_count": str(pos_count),
+            "top_nc_tekst": _format_top(bevindingen, nc_per_clausule, n=8),
+            "top_ofi_tekst": _format_top(bevindingen, ofi_per_clausule, n=5),
+            "top_pos_tekst": _format_top(bevindingen, pos_per_clausule, n=5),
+            "bridging_eis": bridging_eis,
+            "oordeel_zin": _oordeel_zin(nc_count),
+        },
     )
 
 
@@ -228,6 +263,7 @@ def _genereer_management_summary(bevindingen: list[dict[str, Any]]) -> str:
                 message = client.messages.create(
                     model=CLAUDE_MODEL,
                     max_tokens=2000,
+                    temperature=CLAUDE_TEMPERATUUR,
                     messages=[
                         {
                             "role": "user",
@@ -241,6 +277,7 @@ def _genereer_management_summary(bevindingen: list[dict[str, Any]]) -> str:
     message = client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=1500,
+        temperature=CLAUDE_TEMPERATUUR,
         messages=[{"role": "user", "content": _management_summary_prompt(bevindingen)}],
     )
     tekst2: str = message.content[0].text  # type: ignore[union-attr]
@@ -279,15 +316,50 @@ def _overall_oordeel(bevindingen: list[dict[str, Any]]) -> str:
 
 
 def _top3_aanbevelingen(bevindingen: list[dict[str, Any]]) -> str:
-    """Top-3 NC/OFI als feitelijke verwijzing."""
+    """Deterministische input voor de aanbevelingen-prompt: top-3 NC's, dan OFI's.
+
+    Levert alleen de feiten (clausule, classificatie, beschrijving, brondoc);
+    de redactie naar SMART/positieve aanbevelingen gebeurt in
+    :func:`_genereer_aanbevelingen` via de versie-prompt + LLM.
+    """
     nc_items = [b for b in bevindingen if b["classificatie"] == "NC"]
     ofi_items = [b for b in bevindingen if b["classificatie"] == "OFI"]
     top3 = (nc_items + ofi_items)[:3]
     if not top3:
         return "Geen openstaande aanbevelingen."
     return "\n".join(
-        f"{i + 1}. Clausule {b['clausule']}: {b['beschrijving'][:120]}" for i, b in enumerate(top3)
+        f"{i + 1}. Clausule {b['clausule']} ({b['classificatie']}): "
+        f"{b['beschrijving'][:200]} [doc: {b.get('document_naam', '?')[:60]}]"
+        for i, b in enumerate(top3)
     )
+
+
+def _genereer_aanbevelingen(bevindingen: list[dict[str, Any]]) -> str:
+    """Genereer §3 Aanbevelingen via Anthropic (SMART, positief) + verboden-woorden-gate.
+
+    De redactie-regels staan in ``prompts/aanbevelingen_v1.md``; deze functie
+    levert de feiten, draait de LLM op lage temperatuur (near-idempotent) en
+    controleert de output deterministisch op verboden NC-woorden.
+    """
+    invoer = _top3_aanbevelingen(bevindingen)
+    if invoer == "Geen openstaande aanbevelingen.":
+        return invoer
+
+    prompt = _laad_prompt(
+        "aanbevelingen_v1",
+        {"management_context": _MANAGEMENT_CONTEXT, "aanbevelingen_input": invoer},
+    )
+    client = anthropic.Anthropic()
+    message = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=1200,
+        temperature=CLAUDE_TEMPERATUUR,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    tekst: str = message.content[0].text  # type: ignore[union-attr]
+    tekst = tekst.strip()
+    _check_verboden_woorden(tekst, "aanbevelingen")
+    return tekst
 
 
 def _bouw_placeholders(
@@ -296,6 +368,7 @@ def _bouw_placeholders(
     handmatige_review: list[dict[str, Any]],
     norm: str,
     management_summary: str,
+    aanbevelingen: str | None = None,
 ) -> dict[str, str]:
     nc_count = sum(1 for b in bevindingen if b["classificatie"] == "NC")
     ofi_count = sum(1 for b in bevindingen if b["classificatie"] == "OFI")
@@ -335,7 +408,9 @@ def _bouw_placeholders(
         "ontbrekende_clausules": ontbrekend_tekst,
         "handmatige_review_items": handmatige_tekst,
         "conclusie": management_summary[:300],
-        "top3_aanbevelingen": _top3_aanbevelingen(bevindingen),
+        "top3_aanbevelingen": (
+            aanbevelingen if aanbevelingen is not None else _top3_aanbevelingen(bevindingen)
+        ),
         "auditor_naam": "(in te vullen)",
         "auditor_handtekening_datum": str(date.today()),
         "management_naam": "(in te vullen)",
@@ -388,8 +463,15 @@ def genereer_rapport(
 
     logger.info("Management summary genereren via Claude...")
     management_summary = _genereer_management_summary(bevindingen)
+    logger.info("§3 Aanbevelingen genereren via Claude...")
+    aanbevelingen = _genereer_aanbevelingen(bevindingen)
     placeholders = _bouw_placeholders(
-        bevindingen, ontbrekende_clausules, handmatige_review, norm, management_summary
+        bevindingen,
+        ontbrekende_clausules,
+        handmatige_review,
+        norm,
+        management_summary,
+        aanbevelingen=aanbevelingen,
     )
     requests = [
         {

@@ -21,6 +21,20 @@ def _bev(klasse: str, clausule: str = "10.2", beschrijving: str = "x") -> dict[s
     }
 
 
+# Volledige set placeholders voor management_summary_v1 (zie _management_summary_prompt).
+_SUMMARY_VERVANGINGEN: dict[str, str] = {
+    "management_context": "(context)",
+    "nc_count": "2",
+    "ofi_count": "1",
+    "pos_count": "0",
+    "top_nc_tekst": "(geen)",
+    "top_ofi_tekst": "(geen)",
+    "top_pos_tekst": "(geen)",
+    "bridging_eis": "",
+    "oordeel_zin": "De organisatie voldoet niet aan de norm.",
+}
+
+
 # ---------- _oordeel_zin / _oordeel_instructie ----------
 
 
@@ -158,6 +172,66 @@ def test_genereer_management_summary_basis_pad_bestaat_niet(
     with patch.object(rg.anthropic, "Anthropic", return_value=fake_client):
         out = rg._genereer_management_summary([_bev("OFI")])
     assert out == "Fallback."
+
+
+# ---------- _check_verboden_woorden (deterministische gate) ----------
+
+
+def test_check_verboden_woorden_schoon() -> None:
+    schoon = "Leg de leveranciersafspraken vast in een register zodat dit aantoonbaar wordt."
+    assert rg._check_verboden_woorden(schoon) == []
+
+
+def test_check_verboden_woorden_detecteert() -> None:
+    vuil = "De documentatie is onvoldoende en er ontbreekt een register; dit is een risico."
+    gevonden = rg._check_verboden_woorden(vuil)
+    assert gevonden == ["onvoldoende", "ontbreekt", "risico"] or set(gevonden) == {
+        "onvoldoende",
+        "ontbreekt",
+        "risico",
+    }
+
+
+def test_check_verboden_woorden_woordgrens() -> None:
+    """Samenstellingen als 'risicobeoordeling' mogen niet gevlagd worden."""
+    assert rg._check_verboden_woorden("De risicobeoordeling is uitgevoerd.") == []
+
+
+# ---------- _laad_prompt (versie-prompt loader) ----------
+
+
+def test_laad_prompt_vult_placeholders() -> None:
+    prompt = rg._laad_prompt("management_summary_v1", _SUMMARY_VERVANGINGEN)
+    assert "Non-conformiteiten (NC): 2" in prompt
+    assert "{{" not in prompt  # alle placeholders ingevuld
+    assert "<!--" not in prompt  # redacteur-notitie gestript
+
+
+def test_laad_prompt_faalt_op_ontbrekende_placeholder() -> None:
+    with pytest.raises(ValueError, match="niet-ingevulde placeholder"):
+        rg._laad_prompt("management_summary_v1", {"nc_count": "2"})
+
+
+# ---------- _genereer_aanbevelingen (mock anthropic + gate) ----------
+
+
+def test_genereer_aanbevelingen_leeg_zonder_llm() -> None:
+    """Geen NC/OFI → geen LLM-call, vaste tekst."""
+    with patch.object(rg.anthropic, "Anthropic") as fake:
+        out = rg._genereer_aanbevelingen([_bev("positief")])
+    assert out == "Geen openstaande aanbevelingen."
+    fake.assert_not_called()
+
+
+def test_genereer_aanbevelingen_draait_gate(caplog: pytest.LogCaptureFixture) -> None:
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = _fake_anthropic_response(
+        "1. Documentatie is onvoldoende."  # bevat verboden woord
+    )
+    with patch.object(rg.anthropic, "Anthropic", return_value=fake_client):
+        out = rg._genereer_aanbevelingen([_bev("NC")])
+    assert "onvoldoende" in out
+    assert "Verboden woord" in caplog.text  # gate logde de waarschuwing
 
 
 # ---------- genereer_rapport (integratie) ----------
