@@ -74,6 +74,7 @@ De drie lagen volgen alle drie **hetzelfde registry-patroon** — zie
 | `src/iso_audit/modes/` | `autonoom` / `integer` + `base.Decision` |
 | `src/iso_audit/classification/` | LLM-classificatie + clause-mapping; **prompts in `prompts/<versie>.md`** |
 | `src/iso_audit/reporting/` | `report_generation.py`, `local_report.py`, `landscape` |
+| `src/iso_audit/reporting/prompts/` | **Versie-prompts** (`*_v1.md`): redactionele regels voor rapport-taal; pas hier de toon aan, niet in Python |
 | `src/iso_audit/miro/` | Miro-ingest — **READ-only** (write-flow verwijderd, zie CLAUDE.md) |
 | `src/iso_audit/store.py` | SQLite-laag: `verbinding()`, `initialiseer()`, `upsert_*` |
 | `src/iso_audit/interview.py` | Interactieve auditor-interview (§7) |
@@ -90,6 +91,10 @@ uv run iso-audit pipeline --source drive --mode integer --notifier slack
 
 # Kostenschatting zonder LLM-calls:
 uv run iso-audit pipeline --source drive --mode autonoom --dry-run-cost
+
+# Alleen rapport regenereren uit bestaande DB (near-idempotent, geen LLM-
+# classificatie/Drive/Miro) — voor iteratie op rapporttaal:
+uv run iso-audit pipeline --report-only --norm beide
 
 # Eenmalig Drive-template aanmaken:
 uv run iso-audit setup-template

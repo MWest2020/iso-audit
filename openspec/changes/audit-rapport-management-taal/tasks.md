@@ -15,9 +15,9 @@
 
 - [x] `src/iso_audit/reporting/report_generation.py` — `_management_summary_prompt` herschreven: redactie naar `prompts/management_summary_v1.md` (auditor-frame, jargon-vertaal-instructie, bridging-regel), feiten blijven in code
 - [x] `src/iso_audit/reporting/report_generation.py` — `_top3_aanbevelingen` als deterministische input-builder + nieuwe `_genereer_aanbevelingen` (SMART/positieve template via `prompts/aanbevelingen_v1.md`) + `_check_verboden_woorden`-gate op de output
-- [ ] `src/iso_audit/reporting/local_report.py` — sectie 3 (Bevindingen) krijgt aan het begin een OFI-uitlegblok + top-5 thema-aggregatie­tabel
-- [ ] `src/iso_audit/pipeline.py` — handmatige "lead-auditor aanbeveling"-sectie controleren op verboden woorden en herformuleren
-- [ ] `src/iso_audit/pipeline.py` — `--report-only` flag toevoegen die bevindingen uit bestaande DB laadt en alleen rapport regenereert
+- [x] `src/iso_audit/reporting/local_report.py` — OFI-uitleg (`_render_ofi_uitleg`, §2a) + top-5 thema-aggregatietabel (`_render_aanbevelingen`, §3) waren al geïmplementeerd in geëvolueerde code; geverifieerd dekkend voor req 5
+- [ ] `src/iso_audit/pipeline.py` — handmatige "lead-auditor aanbeveling"-sectie controleren op verboden woorden en herformuleren (gate `_check_verboden_woorden` bestaat nu, herbruikbaar)
+- [x] `--report-only` doorgetrokken naar de canonieke `iso-audit pipeline`-CLI (`cli.py`); `run_report_only` in `pipeline.py` bestond al. Laadt bevindingen uit DB, slaat ingest/classificatie/Drive/Miro over; `--source`/`--mode` niet vereist
 
 ## Validatie
 

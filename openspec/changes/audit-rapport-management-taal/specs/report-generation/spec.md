@@ -14,7 +14,13 @@ De management summary MOET de auditor als handelend subject gebruiken bij het be
 
 ### Requirement: SMART-formulering per top-thema
 
-Voor elk top-thema in de management summary MOET de tekst expliciet aangeven: (a) wat is geconstateerd inclusief specifieke documenten/processen, (b) welke concrete actie wordt voorgesteld, (c) eigenaar of tijdshorizon (kwartaal/jaar). Vage formuleringen ("mogelijkheden voor verdere formalisering en consistentie") zijn niet voldoende.
+> **Ontwerpbesluit 2026-06-15:** de SMART-elementen staan in de **§3
+> Aanbevelingen**-sectie, niet in de management summary zelf. De summary blijft
+> kort en verwijst naar §3 (auditor-frame). Dit dient Marianne's intentie
+> (handelingsperspectief) beter dan SMART-blokken in de samenvatting proppen.
+> "Top-thema" hieronder = een rij in de §3 Aanbevelingen-tabel.
+
+Voor elk top-thema in de §3 Aanbevelingen MOET de tekst expliciet aangeven: (a) wat is geconstateerd inclusief specifieke documenten/processen, (b) welke concrete actie wordt voorgesteld, (c) eigenaar of tijdshorizon (kwartaal/jaar). Vage formuleringen ("mogelijkheden voor verdere formalisering en consistentie") zijn niet voldoende.
 
 #### Scenario: Thema-blok bevat alle drie SMART-elementen
 

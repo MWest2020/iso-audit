@@ -86,6 +86,22 @@ def test_pipeline_zonder_source_faalt(
     assert exc.value.code == 2
 
 
+def test_pipeline_report_only_zonder_source_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--report-only regenereert uit DB; --source/--mode niet vereist, run_audit niet aangeroepen."""
+    monkeypatch.delenv(cli._SOURCE_ENV_VAR, raising=False)
+    monkeypatch.delenv(cli._MODE_ENV_VAR, raising=False)
+    with (
+        patch("iso_audit.pipeline.run_report_only") as mock_report,
+        patch("iso_audit.pipeline.run_audit") as mock_audit,
+    ):
+        rc = cli.main(["pipeline", "--report-only", "--norm", "9001"])
+    assert rc == 0
+    mock_report.assert_called_once()
+    mock_audit.assert_not_called()
+
+
 def test_pipeline_met_source_roept_run_audit_aan(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -107,7 +123,9 @@ def test_pipeline_met_source_roept_run_audit_aan(
     mock_audit.assert_called_once()
 
 
-def test_pipeline_env_source_fallback_werkt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_pipeline_env_source_fallback_werkt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv(cli._SOURCE_ENV_VAR, "drive")
     monkeypatch.setenv("AUDIT_DB_PATH", str(tmp_path / "audit.db"))
     with patch("iso_audit.pipeline.run_audit") as mock_audit:

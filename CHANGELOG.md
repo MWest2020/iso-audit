@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-15 — rapport-taal: versie-prompts, SMART-aanbevelingen, gate, --report-only
+
+Change `audit-rapport-management-taal` (gated op akkoord kwaliteitsmanagement
+vóór archivering). Status: code + tests klaar, validatie op echte DB + Marianne-
+akkoord nog open.
+
+- **Versie-prompts** `src/iso_audit/reporting/prompts/management_summary_v1.md`
+  + `aanbevelingen_v1.md`: redactionele regels staan nu versiegestuurd, niet
+  hardcoded. `report_generation.py` levert alleen feiten via `{{placeholders}}`
+  (`_laad_prompt`, faalt luid op niet-ingevulde placeholder).
+- **§3 Aanbevelingen SMART + positief** via `_genereer_aanbevelingen` (LLM met
+  `aanbevelingen_v1`) i.p.v. rauwe NC/OFI-dump. Ontwerpbesluit: SMART in §3,
+  summary blijft kort en verwijst ernaar.
+- **`_check_verboden_woorden`**: deterministische gate (woordgrens-regex) op de
+  aanbevelingen-output; logt waarschuwing, crasht niet. De auditeerbare
+  garantie achter de prompt. Samenstellingen (`risicobeoordeling`) niet gevlagd.
+- **Jargon-vertaal-instructie** in de summary-prompt (ISO-titels → leesbaar).
+- **`temperature=0`** op alle LLM-calls in `report_generation.py` →
+  near-idempotente regeneratie.
+- **`--report-only`** doorgetrokken naar `iso-audit pipeline` (`cli.py`):
+  regenereert rapport uit bestaande DB, slaat ingest/classificatie/Drive/Miro
+  over, `--source`/`--mode` niet vereist. `run_report_only` bestond al.
+- Geverifieerd: OFI-uitleg (§2a) + top-5 thema-tabel (§3) in `local_report.py`
+  waren al geïmplementeerd (req 5).
+- Tests: +8 (gate, prompt-loader, `_genereer_aanbevelingen`, `--report-only`).
+  Suite 657 passed, 1 skipped. Gate ruff + format + mypy --strict schoon.
+
+
 ### Added — 2026-06-15 — `ONBOARDING.md` als levend onboarding-document
 
 - **`ONBOARDING.md`** toegevoegd: van-nul-naar-productief voor iedereen die
