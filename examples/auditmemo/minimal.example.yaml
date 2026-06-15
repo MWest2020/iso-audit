@@ -1,0 +1,14 @@
+schema_version: 1
+slug: minimal
+organization:
+  name: "Voorbeeld-organisatie"
+auditor:
+  name: "Auditor"
+  role: "ISO-auditor"
+brand:
+  logo_svg: |
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="8" fill="#2d7d46"/></svg>
+  colors:
+    primary: "#2d7d46"
+# accent/muted/border/soft_bg, font_stack, standards en defaults worden afgeleid
+# of vallen terug op sensible defaults — dit is een minimaal geldig profiel.

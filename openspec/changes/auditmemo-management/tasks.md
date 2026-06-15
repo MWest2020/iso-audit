@@ -26,9 +26,9 @@
 
 - [x] 3.1 `theme/profile.py`: Profile-model + loader (XDG-slug + pad-traversal-guard), `schema_version`-check, kleurpalet met afgeleide defaults, hex-validatie, policy-gates → `ProfileError`. + 6 tests
 - [x] 3.2 `theme/svg_validator.py`: weiger `<script>`/`<foreignObject>`/externe `<image>`/event-handler/javascript-URI/externe-entity. + 9 tests
-- [ ] 3.3 `theme/elicitation.py`: first-run wizard (8 stappen), opslaan naar XDG-locatie
-- [ ] 3.4 `cli.py`: `profile new/list/show/validate`; `--profile <path>` met traversal-guard
-- [ ] 3.5 `data/profiles/conduction.example.yaml` + `minimal.example.yaml`
+- [x] 3.3 `theme/elicitation.py`: first-run wizard (8 stappen) met injecteerbare IO + `slugify`; vroege SVG-validatie. + tests
+- [x] 3.4 `cli.py`: `profile new/list/show/validate`; `--profile <path>` via de loader-traversal-guard
+- [x] 3.5 `examples/auditmemo/conduction.profile.yaml` + `minimal.example.yaml` (minimaal geldig profiel)
 - [ ] 3.6 `/security-review`: SVG-validator, path-traversal, `safe_load`
 
 ## 4. Classificatie & patronen (capability: auditmemo)

@@ -94,6 +94,30 @@ def memo_cmd(
     _console.print(f"[green]memo geschreven:[/green] {html_pad} + {pdf_pad}")
 
 
+@profile_app.command("new")
+def profile_new(
+    overschrijf: bool = typer.Option(
+        False, "--overschrijf", help="Bestaand profiel overschrijven."
+    ),
+) -> None:
+    """Maak interactief een nieuw profiel aan en sla het op in de XDG-locatie."""
+    from iso_audit.memo.theme.elicitation import run_wizard
+    from iso_audit.memo.theme.profile import opslaan_profiel
+
+    def _ask(text: str, default: str | None = None) -> str:
+        return str(typer.prompt(text) if default is None else typer.prompt(text, default=default))
+
+    def _confirm(text: str, default: bool = False) -> bool:
+        return typer.confirm(text, default=default)
+
+    try:
+        profiel = run_wizard(ask=_ask, ask_confirm=_confirm)
+        pad = opslaan_profiel(profiel, overschrijf=overschrijf)
+    except (ProfileError, ValueError, OSError) as exc:
+        _fail(str(exc))
+    _console.print(f"[green]profiel opgeslagen:[/green] {pad}")
+
+
 @profile_app.command("list")
 def profile_list() -> None:
     """Toon alle profielen in de XDG-locatie."""
