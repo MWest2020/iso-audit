@@ -1,31 +1,36 @@
 # Tasks — auditmemo-ui
 
-> Dunne schil op de geteste harness (`memo.draft` / `builder` / `renderer` /
-> `sources`). Boring & server-gerenderd; lokaal-only. `/review` + `/security-review`
-> vóór merge. Bevestig eerst het stack-besluit (design.md "Niet opgelost").
+> API-first: de API is het duurzame product, de frontend wegwerpbaar. Dunne
+> schil op de geteste motor (`landscape` / `run_audit` / `memo.draft` /
+> `builder` / `renderer` / `sources`). Boring, lokaal-only. `/review` +
+> `/security-review` vóór merge. Bevestig het stack-besluit (design.md).
 
 ## 0. Besluit & skeleton
 
-- [ ] 0.1 Web-framework kiezen (FastAPI vs Flask) + dep toevoegen via `uv add`; bevestig lokaal-only bind
-- [ ] 0.2 `iso-audit ui`-command (start server op 127.0.0.1); working-dir voor sessie-state
+- [ ] 0.1 Stack bevestigen (FastAPI) + dep via `uv add`; lokaal-only bind (127.0.0.1)
+- [ ] 0.2 `iso-audit ui`/`serve`-command; bestand-gebaseerde sessie-working-dir
 
-## 1. Review-workflow (capability: memo-ui)
+## 1. API — triage + memo (capability: audit-api)
 
-- [ ] 1.1 Findings/draft laden in een sessie (bestand-gebaseerd, hervatbaar)
-- [ ] 1.2 Kop-NC's tonen + per blok titel/afwijking/maatregel/acties redigeren (HTMX/vanilla)
-- [ ] 1.3 Edits terugschrijven naar findings/memo-input (build_memo blijft enige assemblage-route)
-- [ ] 1.4 Live HTML-preview + PDF-export-knop via de bestaande renderer
-- [ ] 1.5 "Draft (her)genereren"-knop die `memo.draft.draft_findings` aanroept
+- [ ] 1.1 `GET /findings` — findings + huidige classificatie + triage-status
+- [ ] 1.2 `POST /findings/{id}` — reclassificeer (NC↔OFI) / zet triage-status, **append-only** in `decisions`/`classifications` (actor + timestamp + reden)
+- [ ] 1.3 `POST /memo` — `draft` + render → HTML-preview + PDF (zelfde resultaat als `iso-audit memo`)
+- [ ] 1.4 Tests: handlers met de motor gemockt; append-only-gedrag expliciet getest
 
-## 2. Connector-orchestratie (capability: connector-orchestration, fase 2)
+## 2. Frontend — triage + memo-review (capability: memo-ui)
 
-- [ ] 2.1 Source-keuze uit `sources.available()` in de UI
-- [ ] 2.2 Ingest triggeren via de bestaande adapter → findings-dataset
-- [ ] 2.3 Heldere fout bij ontbrekende credentials/config (geen stille fallback)
+- [ ] 2.1 Minimale web-pagina (Jinja2 + HTMX/vanilla): findings-lijst met triage-checklist + NC↔OFI-toggle
+- [ ] 2.2 Memo-review: kop-NC's redigeren (titel/afwijking/maatregel/acties), live HTML-preview, PDF-export
+- [ ] 2.3 Geen logica in de frontend — alles via de API (verwisselbaarheid bewijzen)
 
-## 3. Kwaliteit & docs
+## 3. Flow-stappen 1 & 2 (fase 2)
 
-- [ ] 3.1 Tests: route-/handler-tests met de motor gemockt; geen live LLM/credentials in CI
-- [ ] 3.2 `/security-review`: lokaal-only bind, geen path-traversal via UI-inputs, YAML/SVG-guards blijven gelden
-- [ ] 3.3 README + `docs/memo-architecture.md` bijwerken met de UI-workflow
-- [ ] 3.4 Bevestig: handlers/modules ≤ 200 regels; UI is schil, geen gedupliceerde logica
+- [ ] 3.1 `GET /landscape` — coverage/gaps (welke bronnen/clausules gedekt; bv. geen Jira)
+- [ ] 3.2 `POST /run` — ingest via geregistreerde source (capability: connector-orchestration); heldere fout bij ontbrekende credentials/config
+- [ ] 3.3 UI: landscape-view + run-trigger
+
+## 4. Kwaliteit & docs
+
+- [ ] 4.1 `/security-review`: lokaal-only bind, geen path-traversal via API-inputs, YAML/SVG-guards, append-only afgedwongen in de API
+- [ ] 4.2 README + `docs/memo-architecture.md` bijwerken met de flow + API-contract
+- [ ] 4.3 Bevestig: handlers/modules ≤ 200 regels; frontend is schil, geen gedupliceerde logica

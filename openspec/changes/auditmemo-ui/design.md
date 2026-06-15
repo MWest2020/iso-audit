@@ -1,47 +1,63 @@
 # Design — auditmemo-ui
 
-## Uitgangspunt
+## Uitgangspunt: API-first, verwisselbare frontend
 
-De UI is een **dunne schil** op een geteste harness. Niets van de memo-logica
-wordt opnieuw geïmplementeerd: de UI roept `iso_audit.memo.draft.draft_findings`,
-`builder.build_memo`, `renderer` en de `iso_audit.sources`-registry aan. Bouw de
-UI dus pas nu de motor af is (gedaan in `auditmemo-management`).
+De **API is het duurzame product**; de frontend is wegwerpbaar. De UI roept de
+bestaande motor aan — `reporting/landscape`, `run_audit`, `memo.draft`,
+`builder`/`renderer`, de `iso_audit.sources`-registry — en herimplementeert
+niets. Zo kan de eerste frontend (minimale web of tkinter) later vervangen
+worden door bv. een Nextcloud-app die dezelfde API consumeert.
+
+Advies: eerste frontend een **minimale web-pagina** (deelt de HTTP-contract-vorm
+met de Nextcloud-endgame), niet tkinter (desktop-only, deelt niets visueel).
+tkinter blijft een optie voor een snelle lokale spike.
 
 ## Stack-besluit (te bevestigen vóór implementatie)
 
-Voorstel: **boring & server-gerenderd**, geen SPA-build.
+- **FastAPI** als lokale API (auto-OpenAPI-schema = nuttig contract voor latere
+  clients). Start via `iso-audit ui`/`serve`. Bind op **127.0.0.1**.
+- Frontend: server-rendered **Jinja2** (al een dep) + **HTMX**/vanilla JS, geen
+  SPA-build / npm-toolchain.
+- **WeasyPrint** (al een dep) voor PDF-export.
+- Geen auth in de MVP — expliciet lokaal-only gedocumenteerd.
 
-- **FastAPI** (of Flask) als lokale server; start via `iso-audit ui`.
-- **Jinja2** (al een dep) voor server-rendered pagina's; **HTMX** of vanilla JS
-  voor de edit-interacties (geen build-step, geen npm-toolchain).
-- **WeasyPrint** (al een dep) voor de PDF-export-knop.
-- Bind standaard op **127.0.0.1** (lokaal, single-user). Geen auth in de MVP —
-  maar expliciet gedocumenteerd als lokaal-only; geen externe expositie.
+## De flow als API-endpoints
 
-Reden: past bij "boring, auditable", vermijdt een frontend-build/supply-chain,
-hergebruikt bestaande deps. Een SPA is uit scope.
+```
+1. GET  /landscape        → coverage/gaps (welke bronnen/clausules gedekt; bv. geen Jira)
+2. POST /run              → trigger ingest via een geregistreerde source → findings
+3. GET  /findings         → findings + huidige classificatie + triage-status
+   POST /findings/{id}    → reclassificeer (NC↔OFI) / zet triage-status  [APPEND-ONLY]
+4. POST /memo             → draft (LLM) + render → HTML-preview + PDF
+```
+
+## Append-only triage (27001-scope, non-negotiable)
+
+Stap-3-acties zijn auditor-**beslissingen**. De API MUST ze append-only
+vastleggen in de bestaande `decisions`/`classifications`-tabellen: nooit
+overschrijven, elke override met actor + timestamp + reden. De gerenderde memo
+verwijst naar deze trail (samen met de findings-hash) → volledig herleidbaar.
+De UI toont de huidige staat; de **API** bewaakt de onveranderlijkheid.
 
 ## Datastroom
 
 ```
-[source-registry] --ingest--> findings.json
-       │ (fase 2, via UI)
-findings.json --draft--> draft (LLM kop-NC's)  ──► review-UI (edit titel/
-                                                    afwijking/maatregel/acties)
-       review-UI --opslaan--> findings + memo-input  ──► build_memo ──► HTML-preview / PDF
+[landscape] → [source-registry: ingest] → findings (DB)
+   → triage-UI (reclassify/selecteer, append-only) → findings + memo-input
+   → draft (LLM kandidaten + triage-checklist) → build_memo → HTML-preview / PDF
 ```
 
-De edits in de UI muteren de **findings/memo-input** (de bron), niet het
-render-model — zo blijft `build_memo` de enige assemblage-route en blijft de
-audit-trail (findings-hash, timestamp) kloppen.
+Edits muteren findings/memo-input + de append-only trail; `build_memo` blijft de
+enige assemblage-route zodat de audit-trail klopt.
 
 ## Niet opgelost / aandachtspunten
 
-- **Web-framework-keuze** (FastAPI vs Flask) + nieuwe dep — bevestigen vóór bouw.
-- **State**: waar leeft de sessie-staat (in-memory vs een working-dir met
-  findings/draft-bestanden)? Voorstel: bestand-gebaseerd in een working-dir, zodat
-  een sessie reproduceerbaar/hervatbaar is en near-idempotent blijft.
-- **Security**: lokaal-only bind; SVG/YAML-guards van de harness blijven gelden;
-  geen path-traversal via UI-inputs. `/security-review` vóór merge.
-- **Connector-trigger** raakt live credentials (gws/Jira) — fase 2, met dezelfde
+- **Framework + nieuwe dep** (FastAPI) bevestigen vóór bouw.
+- **Sessie-state**: bestand-gebaseerd in een working-dir (reproduceerbaar,
+  hervatbaar, near-idempotent) i.p.v. in-memory.
+- **Security**: lokaal-only bind; YAML/SVG/path-guards van de harness blijven
+  gelden; geen path-traversal via API-inputs. `/security-review` vóór merge.
+- **Connector-trigger** raakt live credentials (gws/Jira) — fasering met dezelfde
   expliciete-config-discipline als de CLI.
+- **Fasering**: MVP = stap 3 (triage) + 4 (memo). Stap 1 (landscape-view) en 2
+  (run-trigger) erna.

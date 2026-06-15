@@ -1,48 +1,53 @@
 ## Why
 
-De auditmemo-harness staat: `iso-audit draft` (LLM-draft van kop-NC's uit een
-ruwe run) + `iso-audit memo` (render naar HTML/PDF) + profielen + user-pointed
-norm-DB. Maar de auditor werkt nu via JSON/YAML-bestanden en CLI-flags — niet
-toegankelijk. Het eindproduct (de management-memo) is auditor-oordeelswerk:
-welke NC's de kop-NC's worden, het narratief, de maatregelen, de acties.
+De auditmemo-harness staat: landscape, run, LLM-draft (`iso-audit draft`) en
+render (`iso-audit memo`) + profielen + user-pointed norm-DB + de triage-
+checklist (`TriageStatus`). Maar de auditor werkt nu via JSON/YAML + CLI-flags.
+De volledige auditor-flow is, van de grond:
 
-Een **auditor-UI** maakt die review-loop bruikbaar: findings inzien, de
-LLM-draft per kop-NC reviewen/redigeren, en de memo renderen — zonder een
-editor op een YAML-bestand. Dit is de volgende stap in de vastgelegde richting
-"harness = fundament, UI erop, auditor houdt het oordeel" en sluit aan op de
-auditor-spiegel-capability.
+1. **Landscape** bekijken — wat is gedekt, en wat niet (bv. geen Jira-bron).
+2. **Run** zoals altijd (ingest → classificatie → output).
+3. **Human-in-the-loop triage** — de auditor selecteert wat relevant is, pent
+   NC↔OFI om, en zet de triage-status per kandidaat. Dit is de stap die nu
+   ontbreekt en die de UI toevoegt.
+4. **Auditmemo** voor management — het eindproduct.
 
-Daarbovenop: de **connector-engine** (de bestaande `iso_audit.sources`-registry:
-Drive/Planning/Jira) via de UI laten triggeren, zodat de hele keten —
-ingest → classificatie → findings → LLM-draft → review → memo — vanuit één
-plek loopt.
+Een **API-first kleine app** maakt deze flow bruikbaar: de **API is het
+duurzame product**, de frontend is wegwerpbaar (minimale web/tkinter nu → later
+een Nextcloud-app o.i.d.). Dit is de vastgelegde richting "harness = fundament,
+UI = dunne schil" en sluit aan op de auditor-spiegel-capability.
 
 ## What Changes
 
-- **Nieuwe `iso-audit ui` (of `serve`) command**: start een **lokale** web-UI
-  (single-user, geen externe expositie) bovenop de bestaande harness.
-- **Review-workflow**: laad een findings-dataset (of draft), toon de
-  gedrafte kop-NC's, laat per blok titel/afwijking/maatregel/acties redigeren,
-  render live naar HTML-preview + PDF-export. Edits gaan terug naar de
-  findings/memo-input — de motor (`build_memo`/`render`) blijft de bron.
-- **Connector-orchestratie (gefaseerd)**: kies een geregistreerde `source`,
-  trigger ingest → findings, en stroom door naar de draft/review. De
-  sources-registry is de connector-engine; de UI is de trigger-schil.
-- **Geen herimplementatie van logica in de UI**: de UI roept de bestaande
-  `draft`/`builder`/`renderer`/`sources`-lagen aan (dunne schil).
+- **HTTP-API** (lokaal) bovenop de bestaande motor, met endpoints per flow-stap:
+  - `landscape` — coverage/gaps ophalen (welke bronnen/clausules wel/niet gedekt).
+  - `run` — een run triggeren via een geregistreerde `source` (de connector-engine
+    is de bestaande `iso_audit.sources`-registry).
+  - `triage` — findings ophalen + per finding/kandidaat de classificatie
+    (NC↔OFI) en triage-status muteren. **Append-only audit-trail.**
+  - `memo` — `draft` + render naar HTML-preview + PDF-export.
+- **Verwisselbare frontend**: een minimale web-UI die de API consumeert. Geen
+  logica in de frontend; alle beslissingen lopen door de API zodat ze
+  herleidbaar zijn. tkinter is een optie voor een snelle lokale spike, maar web
+  deelt de HTTP-vorm met de Nextcloud-endgame.
+- **Append-only triage**: reclassificatie en triage-keuzes worden in de
+  bestaande `decisions`/`classifications`-tabellen vastgelegd (nooit
+  overschrijven; wie/wanneer/waarom). De API dwingt dit af, niet de UI.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `memo-ui` — lokale auditor-UI voor review/edit/render van de management-memo
-  bovenop de bestaande draft/render-motor.
-- `connector-orchestration` — een geregistreerde source via de UI triggeren tot
-  een findings-dataset, als opstap naar draft → review → memo.
+- `audit-api` — lokale HTTP-API die de flow-stappen (landscape, run, triage,
+  memo) blootlegt bovenop de bestaande motor; append-only voor beslissingen.
+- `memo-ui` — minimale, verwisselbare frontend op de API voor de auditor-flow
+  (triage + memo-review/render).
+- `connector-orchestration` — een geregistreerde source via de API/UI triggeren
+  tot een findings-dataset.
 
 ## Scope-grens
 
-MVP: **lokale** review-UI over een bestaande findings/draft, met live
-HTML-preview + PDF-export. Connector-trigger als tweede fase. Buiten scope:
-multi-user/auth, hosting/deployment, gelijktijdige sessies, een SPA-build —
-bewust een boring, server-gerenderde aanpak (zie design).
+MVP: **lokale** API + minimale web-frontend voor stap 3 (triage) en 4 (memo),
+met live HTML-preview + PDF-export. Stap 1 (landscape-view) en stap 2
+(run-trigger) als opvolgende fasen. Buiten scope: multi-user/auth, hosting,
+de Nextcloud-app zelf, een SPA-build, DB-migratie. Bewust boring en lokaal.
