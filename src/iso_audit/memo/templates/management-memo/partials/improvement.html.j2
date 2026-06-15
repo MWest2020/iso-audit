@@ -3,7 +3,7 @@
 
 <h4>Norm</h4>
 {% for c in imp.citations %}
-<p class="norm-ref">{{ c.standard }} {{ c.clause }} — {{ c.title }}</p>
+<p class="norm-ref">{{ c.standard }} §{{ c.clause }} — {{ c.title }}</p>
 <div class="norm-quote">"{{ c.text }}"</div>
 {% endfor %}
 

@@ -76,8 +76,10 @@ class NormDatabase:
                 f"Norm-tekst voor {standard} {clause} ontbreekt in taal {language!r}. "
                 "Lever een norm-DB met deze taal aan."
             )
+        # Toon de leesbare standaardnaam ("ISO 27001:2022") i.p.v. de slug.
+        weergave = str(norm.get("metadata", {}).get("standard") or standard)
         return ClauseCitation(
-            standard=standard,
+            standard=weergave,
             clause=clause,
             title=str(titel).strip(),
             text=str(tekst).strip(),
