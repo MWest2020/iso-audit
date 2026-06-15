@@ -28,5 +28,5 @@
 
 ## Documentatie
 
-- [ ] CHANGELOG.md entry met datum, wijziging, reden, validatie-status
+- [x] CHANGELOG.md entry met datum, wijziging, reden, validatie-status (2026-06-15, sectie Added)
 - [x] Schrijfregels gedocumenteerd als onderhoudsgids: staan nu in de versie-prompts zelf (`prompts/*_v1.md`, met redacteur-notitie in de header) + `ONBOARDING.md` (prompts-map-regel). Dit vervangt het stale `audit/README.md`-pad
