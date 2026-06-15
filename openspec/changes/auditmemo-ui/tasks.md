@@ -21,14 +21,14 @@
 
 - [x] 2.1 Web-pagina (`api/ui.html`, vanilla JS, geen build/deps): findings-lijst met NC↔OFI/POSITIVE-toggle (geen UNCLASSIFIED) + triage-select; severity-filter (NC-kandidaten / alle)
 - [x] 2.1b Triage versimpeld naar `open`/`valide`/`niet_valide`; `niet_valide` valt uit de memo. **Memo-stap gated**: greyed-out + server-side 409 tot 0 openstaande NC-kandidaten (`GET /triage/status`)
-- [ ] 2.2 Memo-review: live HTML-preview (iframe) + PDF-export ✓; **inline redactie** van kop-NC-tekst (titel/afwijking/maatregel/acties) is follow-up (vereist tekstveld-PATCH op de API)
+- [x] 2.2 Memo-review: live HTML-preview (iframe) + PDF-export + **inline redactie** van kop-NC-tekst (titel/afwijking/maatregel) via `POST /findings/{id}` (append-only) + `GET /findings/{id}`. UI-editor in stap 4, gated met de memo-stap
 - [x] 2.3 Geen logica in de frontend — alles via de API (severity/triage/preview/export)
 
 ## 3. Flow-stappen 1 & 2
 
-- [x] 3.1 `GET /landscape` — dekking/gaps (geregistreerde bronnen, normen, NC-clausules, scope-note) + UI-view
-- [ ] 3.2 `POST /run` — MVP toont de (geladen) run-samenvatting; **live ingest via een geregistreerde source** (connector-orchestration, met credential-checks) is follow-up
-- [x] 3.3 UI: landscape-view + run-knop
+- [x] 3.1 Stap 1 = **config-sectie**: `GET /config/options` (normen + bronnen) + UI-selectoren (geen feedback-dump meer)
+- [ ] 3.2 `POST /run` — MVP echoot de config + (geladen) run-samenvatting; **live ingest via een geregistreerde source** (connector-orchestration + credential-checks + real-time streaming feedback) is de volgende grote stap
+- [x] 3.3 UI: config-selectoren + run-knop
 
 ## 4. Kwaliteit & docs
 
