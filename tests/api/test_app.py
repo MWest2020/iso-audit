@@ -148,8 +148,8 @@ def test_run_zonder_body(tmp_path: Path) -> None:
 
 def test_run_progress_synchroon(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    start = client.post("/run/start", params={"pace": 0}).json()  # pace 0 = synchroon
-    assert start == {"total": 2, "status": "done"}
+    start = client.post("/run/start", json={"mode": "sim", "pace": 0}).json()  # synchroon
+    assert start == {"mode": "sim", "total": 2, "status": "done"}
     p = client.get("/run/progress").json()
     assert p["status"] == "done"
     assert p["done"] == 2 and p["total"] == 2
@@ -160,6 +160,41 @@ def test_run_progress_idle(tmp_path: Path) -> None:
     p = _client(tmp_path).get("/run/progress").json()
     assert p["status"] == "idle"
     assert p["done"] == 0
+
+
+def test_live_run_worker_draft_en_status(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Live-worker: pipeline + draft gemockt → findings vervangen + status done."""
+    import iso_audit.api.run_job as rj
+    from iso_audit.api.session import AuditSession, _RunState
+    from iso_audit.memo.models import Finding
+
+    monkeypatch.setattr(rj, "run_live_pipeline", lambda **kw: kw["on_log"]("Stap 7/7: klaar"))
+    fake = [
+        Finding(
+            id="nc-8.15",
+            severity="NC",
+            standard="iso-27001-2022",
+            clause="8.15",
+            title="Logging",
+            description="d",
+            triage_status="open",
+        )
+    ]
+    monkeypatch.setattr(rj, "draft_from_db", lambda **kw: fake)
+
+    (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
+    s = AuditSession(
+        tmp_path,
+        profile=str(_EX / "conduction.profile.yaml"),
+        norms_dir="examples/norms",
+        memo_input_path=str(_EX / "memo-input.yaml"),
+    )
+    s._run = _RunState(status="running", total=7, mode="live")
+    s._run_live_worker("27001", ["drive"], "8", 3)  # synchroon (geen thread)
+
+    assert s._run.status == "done"
+    assert [f.id for f in s.findings()] == ["nc-8.15"]
+    assert any("Stap 7/7" in m for m in s._run.log)
 
 
 def test_index_serveert_ui(tmp_path: Path) -> None:

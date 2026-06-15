@@ -1,0 +1,95 @@
+"""Live-run-orchestratie: run_audit (chapter-scoped) → DB-export → draft.
+
+Stap 2 in live-modus draait de echte pipeline (Drive-ingest + LLM-classificatie),
+vangt de "Stap X/7"-voortgang op via een logging-handler, exporteert de findings
+uit de DB en draaft de kop-NC's. Background-thread; geen interactieve review
+(`no_review=True`). De DB→Finding-mapping is een pure, testbare functie.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Callable
+
+from iso_audit.memo.draft import draft_findings
+from iso_audit.memo.models import Finding
+from iso_audit.memo.norm_lookup import laad_norm_db
+
+_NORM_SLUG = {"9001": "iso-9001-2015", "27001": "iso-27001-2022"}
+_SEV = {"NC": "NC", "OFI": "OFI", "positief": "POSITIVE"}
+
+
+class _ProgressHandler(logging.Handler):
+    """Duwt pipeline-logregels naar een sink (voor live voortgang in de UI)."""
+
+    def __init__(self, sink: Callable[[str], None]) -> None:
+        super().__init__()
+        self._sink = sink
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self._sink(record.getMessage())
+
+
+def export_db_findings(*, norm: str = "9001") -> list[Finding]:
+    """Lees de bevindingen uit de audit-DB en map ze naar het memo-Finding-model."""
+    import sqlite3
+
+    from iso_audit.classification.clause_mapping import laad_clause_map
+    from iso_audit.store import verbinding
+
+    titels = laad_clause_map(norm).get("clausules", {})
+    conn = verbinding()
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM bevindingen ORDER BY clausule_id").fetchall()
+    conn.close()
+    findings: list[Finding] = []
+    for r in rows:
+        clausule = r["clausule_id"]
+        titel = titels.get(clausule, {}).get("titel", clausule)
+        findings.append(
+            Finding(
+                id=str(r["id"]),
+                severity=_SEV.get(r["classificatie"], "UNCLASSIFIED"),  # type: ignore[arg-type]
+                standard=_NORM_SLUG.get(r["norm"], "iso-9001-2015"),
+                clause=clausule,
+                title=f"NC clausule {clausule} — {titel} [{(r['document_naam'] or '?')[:50]}]",
+                description=r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)",
+            )
+        )
+    return findings
+
+
+def run_live_pipeline(
+    *,
+    norm: str,
+    sources: list[str],
+    chapter: str | None,
+    on_log: Callable[[str], None],
+) -> None:
+    """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt)."""
+    from iso_audit import pipeline
+    from iso_audit.modes.autonoom import AutonoomMode
+    from iso_audit.store import initialiseer, verbinding
+
+    handler = _ProgressHandler(on_log)
+    pijplijn_logger = logging.getLogger("iso_audit")
+    pijplijn_logger.addHandler(handler)
+    try:
+        conn = verbinding()
+        initialiseer(conn)
+        pipeline.run_audit(
+            norm,
+            no_review=True,
+            chapter=chapter,
+            mode=AutonoomMode(conn=conn),
+            sources=sources or ["drive"],
+        )
+    finally:
+        pijplijn_logger.removeHandler(handler)
+
+
+def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> list[Finding]:
+    """Exporteer DB-findings en draaf de kop-NC's (na een live run)."""
+    ruw = export_db_findings(norm=norm)
+    norm_db = laad_norm_db(norms_dir)
+    return draft_findings(ruw, norm_db=norm_db, language=language, top_n=top_n)

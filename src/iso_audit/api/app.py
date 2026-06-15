@@ -35,6 +35,17 @@ class RunConfig(BaseModel):
     sources: list[str] = []
 
 
+class RunStartRequest(BaseModel):
+    """Stap 2-start: live pipeline of sim-timer, met chapter-scoping."""
+
+    mode: str = "sim"  # "sim" | "live"
+    norm: str = "9001"  # run-code: 9001 | 27001 | beide
+    sources: list[str] = []
+    chapter: str | None = None  # hoofdstuk-filter (scoping), bv. "8"
+    top_n: int = 3
+    pace: float = 0.05
+
+
 class FindingSummary(BaseModel):
     id: str
     severity: Severity
@@ -102,9 +113,17 @@ def create_app(session: AuditSession) -> FastAPI:
         return session.config_options()
 
     @app.post("/run/start")
-    def run_start(pace: float = 0.05) -> dict[str, object]:
-        """Stap 2: indexeer + start de voortgangs-job (timer/ETA via /run/progress)."""
-        return session.start_run(pace_s=pace)
+    def run_start(req: RunStartRequest | None = None) -> dict[str, object]:
+        """Stap 2: start de run (live pipeline of sim-timer); voortgang via /run/progress."""
+        r = req or RunStartRequest()
+        return session.start_run(
+            mode=r.mode,
+            norm=r.norm,
+            sources=r.sources,
+            chapter=r.chapter,
+            top_n=r.top_n,
+            pace_s=r.pace,
+        )
 
     @app.get("/run/progress")
     def run_progress() -> dict[str, object]:

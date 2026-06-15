@@ -9,9 +9,10 @@ garantie: reclassificatie/triage wordt nooit overschreven, alleen toegevoegd.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,13 +31,15 @@ class SessionError(ValueError):
 
 @dataclass
 class _RunState:
-    """Voortgang van de stap-2-run (indexatie + timer)."""
+    """Voortgang van de stap-2-run (indexatie/timer of live pipeline)."""
 
     status: str = "idle"
     total: int = 0
     done: int = 0
     start: float = 0.0
     pace: float = 0.0
+    mode: str = "sim"
+    log: list[str] = field(default_factory=list)
 
 
 class AuditSession:
@@ -146,22 +149,38 @@ class AuditSession:
             "sources": beschikbare_bronnen(),
         }
 
-    def start_run(self, *, pace_s: float = 0.05) -> dict[str, object]:
-        """Stap 2: indexeer de items en start een voortgangs-job (met timer/ETA).
-
-        ``pace_s`` = seconden per item (demo-tempo). ``pace_s<=0`` draait synchroon
-        (voor tests). De echte live-ingest via een bron is de connector-fase.
+    def start_run(
+        self,
+        *,
+        mode: str = "sim",
+        norm: str = "9001",
+        sources: list[str] | None = None,
+        chapter: str | None = None,
+        top_n: int = 3,
+        pace_s: float = 0.05,
+    ) -> dict[str, object]:
+        """Stap 2: start de run. ``mode='live'`` = echte pipeline (Drive+LLM);
+        ``mode='sim'`` = indexatie-timer (fallback). ``pace_s<=0`` = synchroon (tests).
         """
+        if mode == "live":
+            self._run = _RunState(status="running", total=7, start=time.monotonic(), mode="live")
+            threading.Thread(
+                target=self._run_live_worker,
+                args=(norm, sources or ["drive"], chapter, top_n),
+                daemon=True,
+            ).start()
+            return {"mode": "live", "status": "running"}
+
         total = len(self.findings())
         self._run = _RunState(
-            status="running", total=total, done=0, start=time.monotonic(), pace=pace_s
+            status="running", total=total, start=time.monotonic(), pace=pace_s, mode="sim"
         )
         if pace_s <= 0:
             self._run.done = total
             self._run.status = "done"
         else:
             threading.Thread(target=self._run_worker, daemon=True).start()
-        return {"total": total, "status": self._run.status}
+        return {"mode": "sim", "total": total, "status": self._run.status}
 
     def _run_worker(self) -> None:
         run = self._run
@@ -170,17 +189,43 @@ class AuditSession:
             run.done = i + 1
         run.status = "done"
 
+    def _run_live_worker(
+        self, norm: str, sources: list[str], chapter: str | None, top_n: int
+    ) -> None:
+        from iso_audit.api.run_job import draft_from_db, run_live_pipeline
+
+        def _on_log(msg: str) -> None:
+            self._run.log.append(msg)
+            m = re.search(r"Stap (\d+)/(\d+)", msg)
+            if m:
+                self._run.done, self._run.total = int(m.group(1)), int(m.group(2))
+
+        try:
+            run_live_pipeline(norm=norm, sources=sources, chapter=chapter, on_log=_on_log)
+            self._run.log.append("Findings exporteren + kop-NC's draften…")
+            drafted = draft_from_db(
+                norm=norm, norms_dir=str(self._norms_dir), language="nl", top_n=top_n
+            )
+            self._save(drafted)
+            self._run.done = self._run.total
+            self._run.status = "done"
+        except Exception as exc:  # surface elke pipeline-fout in de UI
+            self._run.log.append(f"FOUT: {exc}")
+            self._run.status = "error"
+
     def run_progress(self) -> dict[str, object]:
-        """Voortgang van stap 2: done/total, verstreken tijd en aftellende ETA."""
+        """Voortgang van stap 2: done/total, verstreken tijd, ETA en (live) logregels."""
         r = self._run
         elapsed = (time.monotonic() - r.start) if r.status != "idle" else 0.0
         eta = (r.total - r.done) * (elapsed / r.done) if r.done and r.status == "running" else 0.0
         return {
             "status": r.status,
+            "mode": r.mode,
             "total": r.total,
             "done": r.done,
             "elapsed_s": round(elapsed, 1),
             "eta_s": round(eta, 1),
+            "log": r.log[-25:],
         }
 
     def run_summary(

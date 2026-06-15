@@ -43,10 +43,13 @@
 </div>
 
 <div class="step">
-  <h2><span class="num">2</span>Run <span class="note">— indexeert de bestanden, met timer + ETA</span></h2>
-  <button onclick="startRun()">Start run</button>
+  <h2><span class="num">2</span>Run <span class="note">— live pipeline of indexatie-timer</span></h2>
+  <label>Chapter-filter: <input id="chapter" placeholder="bv. 8 · leeg = alles" style="width:140px"></label>
+  &nbsp; <label><input type="checkbox" id="live-mode"> Live run (echte pipeline + LLM)</label>
+  <br><br><button onclick="startRun()">Start run</button>
   <div id="bar-wrap" hidden><div id="bar"></div></div>
   <div id="run-progress" class="note" hidden></div>
+  <div id="run-log" class="out" hidden style="max-height:200px;overflow:auto;font-size:.8rem"></div>
   <div id="run-out" class="out" hidden></div>
 </div>
 
@@ -89,27 +92,36 @@ function selectedConfig(){
     sources:[...document.querySelectorAll(".cfg-src:checked")].map(e=>e.value)
   };
 }
+function normCode(norms){
+  const a=norms.some(n=>n.includes("9001")), b=norms.some(n=>n.includes("27001"));
+  return (a&&b)?"beide":b?"27001":"9001";
+}
 async function startRun(){
   const cfg = selectedConfig();
-  await fetch("/run/start",{method:"POST"});
-  const prog = document.getElementById("run-progress"); prog.hidden=false;
-  const barWrap = document.getElementById("bar-wrap"); barWrap.hidden=false;
-  const bar = document.getElementById("bar");
-  const poll = setInterval(async ()=>{
-    const p = await j("/run/progress");
-    const pct = p.total ? Math.round(100*p.done/p.total) : 0;
-    bar.style.width = pct + "%";
-    prog.textContent = `Indexatie: ${p.done}/${p.total} bestanden (${pct}%) · verstreken ${p.elapsed_s}s · resterend ~${p.eta_s}s`;
-    if(p.status==="done"){
+  const live = document.getElementById("live-mode").checked;
+  const chapter = document.getElementById("chapter").value.trim() || null;
+  await fetch("/run/start",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({mode:live?"live":"sim",norm:normCode(cfg.norms),sources:cfg.sources,chapter})});
+  const prog=document.getElementById("run-progress"); prog.hidden=false;
+  const bar=document.getElementById("bar"); document.getElementById("bar-wrap").hidden=false;
+  const logEl=document.getElementById("run-log");
+  const poll=setInterval(async ()=>{
+    const p=await j("/run/progress");
+    const pct=p.total?Math.round(100*p.done/p.total):0;
+    bar.style.width=pct+"%";
+    const eenheid = p.mode==="live" ? `stap ${p.done}/${p.total}` : `${p.done}/${p.total} bestanden`;
+    prog.textContent=`${eenheid} (${pct}%) · verstreken ${p.elapsed_s}s · resterend ~${p.eta_s}s`;
+    if(p.log && p.log.length){ logEl.hidden=false; logEl.textContent=p.log.join("\n"); logEl.scrollTop=logEl.scrollHeight; }
+    if(p.status==="done"||p.status==="error"){
       clearInterval(poll);
-      prog.textContent = `Klaar: ${p.total} bestanden geïndexeerd in ${p.elapsed_s}s.`;
-      const d = await j("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
-      const el = document.getElementById("run-out"); el.hidden=false;
-      el.textContent =
-        `Config — normen: ${d.config.norms.join(", ")||"(geen)"} · bronnen: ${d.config.sources.join(", ")||"(geen)"}\n`+
-        `Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}`;
+      if(p.status==="error"){ prog.textContent="Run mislukt — zie log."; return; }
+      prog.textContent=`Klaar in ${p.elapsed_s}s.`;
+      const d=await j("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+      const el=document.getElementById("run-out"); el.hidden=false;
+      el.textContent=`Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}`;
+      refreshGate();
     }
-  }, 400);
+  }, live?700:400);
 }
 async function loadFindings(severity){
   const fs = await j("/findings" + (severity ? "?severity="+severity : ""));

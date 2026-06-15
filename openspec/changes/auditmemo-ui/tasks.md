@@ -27,7 +27,7 @@
 ## 3. Flow-stappen 1 & 2
 
 - [x] 3.1 Stap 1 = **config-sectie**: `GET /config/options` (normen + bronnen) + UI-selectoren (geen feedback-dump meer)
-- [ ] 3.2 `POST /run` — MVP echoot de config + (geladen) run-samenvatting; **live ingest via een geregistreerde source** (connector-orchestration + credential-checks + real-time streaming feedback) is de volgende grote stap
+- [x] 3.2 `POST /run/start` met **live-modus** (echte `run_audit`: Drive-ingest + LLM-classificatie, chapter-scoped, `no_review`) → DB-export → draft, met opgevangen "Stap X/7"-voortgang + logregels via `GET /run/progress`. **Sim-timer als fallback.** Bron-subscoping = nice-to-have (zie memory `todo-bron-subscoping`)
 - [x] 3.3 UI: config-selectoren + run-knop
 
 ## 4. Kwaliteit & docs
