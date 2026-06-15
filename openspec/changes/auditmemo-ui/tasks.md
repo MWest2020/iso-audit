@@ -19,15 +19,15 @@
 
 ## 2. Frontend — triage + memo-review (capability: memo-ui)
 
-- [ ] 2.1 Minimale web-pagina (Jinja2 + HTMX/vanilla): findings-lijst met triage-checklist + NC↔OFI-toggle
-- [ ] 2.2 Memo-review: kop-NC's redigeren (titel/afwijking/maatregel/acties), live HTML-preview, PDF-export
-- [ ] 2.3 Geen logica in de frontend — alles via de API (verwisselbaarheid bewijzen)
+- [x] 2.1 Web-pagina (`api/ui.html`, vanilla JS, geen build/deps): findings-lijst met NC↔OFI-toggle + triage-select; severity-filter (NC-kandidaten / alle)
+- [ ] 2.2 Memo-review: live HTML-preview (iframe) + PDF-export ✓; **inline redactie** van kop-NC-tekst (titel/afwijking/maatregel/acties) is follow-up (vereist tekstveld-PATCH op de API)
+- [x] 2.3 Geen logica in de frontend — alles via de API (severity/triage/preview/export)
 
-## 3. Flow-stappen 1 & 2 (fase 2)
+## 3. Flow-stappen 1 & 2
 
-- [ ] 3.1 `GET /landscape` — coverage/gaps (welke bronnen/clausules gedekt; bv. geen Jira)
-- [ ] 3.2 `POST /run` — ingest via geregistreerde source (capability: connector-orchestration); heldere fout bij ontbrekende credentials/config
-- [ ] 3.3 UI: landscape-view + run-trigger
+- [x] 3.1 `GET /landscape` — dekking/gaps (geregistreerde bronnen, normen, NC-clausules, scope-note) + UI-view
+- [ ] 3.2 `POST /run` — MVP toont de (geladen) run-samenvatting; **live ingest via een geregistreerde source** (connector-orchestration, met credential-checks) is follow-up
+- [x] 3.3 UI: landscape-view + run-knop
 
 ## 4. Kwaliteit & docs
 

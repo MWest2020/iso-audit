@@ -104,6 +104,40 @@ class AuditSession:
         )
         return doel
 
+    def counts(self) -> dict[str, int]:
+        """Tel findings per severity."""
+        telling: dict[str, int] = {}
+        for f in self.findings():
+            telling[f.severity] = telling.get(f.severity, 0) + 1
+        return telling
+
+    def landscape(self) -> dict[str, object]:
+        """Stap 1: dekking en gaps — welke bronnen/normen/clausules in beeld zijn."""
+        from iso_audit.ingest import beschikbare_bronnen
+
+        fs = self.findings()
+        return {
+            "sources_registered": beschikbare_bronnen(),
+            "standards": sorted({f.standard for f in fs}),
+            "counts": self.counts(),
+            "clauses_with_nc": sorted({f.clause for f in fs if f.severity == "NC"}),
+            "note": (
+                "Niet-gekoppelde bronnen (bv. Jira/Calendar/Notion) vallen buiten "
+                "tool-scope; gaps daar vereisen handmatige verificatie in de auditsessie."
+            ),
+        }
+
+    def run_summary(self) -> dict[str, object]:
+        """Stap 2: samenvatting van de (geladen) run-output."""
+        return {
+            "findings": len(self.findings()),
+            "counts": self.counts(),
+            "note": (
+                "Findings geladen uit de sessie (resultaat van een eerdere run). "
+                "Live source-trigger via een connector is de connector-orchestration-fase."
+            ),
+        }
+
     def trail(self) -> list[dict[str, str]]:
         """De append-only triage-trail (chronologisch)."""
         if not self.triage_log.is_file():

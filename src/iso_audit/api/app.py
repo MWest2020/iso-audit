@@ -38,7 +38,7 @@ def create_app(session: AuditSession) -> FastAPI:
     app = FastAPI(title="iso-audit — auditor-API", version="0.1.0")
 
     @app.get("/findings", response_model=list[FindingSummary])
-    def lijst_findings() -> list[FindingSummary]:
+    def lijst_findings(severity: Severity | None = None) -> list[FindingSummary]:
         return [
             FindingSummary(
                 id=f.id,
@@ -48,6 +48,7 @@ def create_app(session: AuditSession) -> FastAPI:
                 triage_status=f.triage_status,
             )
             for f in session.findings()
+            if severity is None or f.severity == severity
         ]
 
     @app.post("/findings/{finding_id}", response_model=FindingSummary)
@@ -74,6 +75,16 @@ def create_app(session: AuditSession) -> FastAPI:
         """De append-only triage-trail (auditor-beslissingen)."""
         return session.trail()
 
+    @app.get("/landscape")
+    def landscape() -> dict[str, object]:
+        """Stap 1: dekking en gaps."""
+        return session.landscape()
+
+    @app.post("/run")
+    def run() -> dict[str, object]:
+        """Stap 2: samenvatting van de (geladen) run-output."""
+        return session.run_summary()
+
     @app.get("/memo/preview", response_class=HTMLResponse)
     def memo_preview() -> str:
         try:
@@ -88,21 +99,12 @@ def create_app(session: AuditSession) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
-        return _INDEX_HTML
+        return _UI_HTML
 
     return app
 
 
-_INDEX_HTML = """<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8">
-<title>iso-audit — auditor</title></head>
-<body style="font-family:sans-serif;max-width:900px;margin:2rem auto">
-<h1>iso-audit — auditor-flow</h1>
-<p>Lokale API. Endpoints:
-<code>GET /findings</code>, <code>POST /findings/{id}</code> (triage, append-only),
-<code>GET /trail</code>, <code>GET /memo/preview</code>,
-<code>POST /memo/export</code>. Schema: <a href="/docs">/docs</a>.</p>
-<p><a href="/findings">findings (JSON)</a> · <a href="/memo/preview">memo-preview</a></p>
-</body></html>"""
+_UI_HTML = (Path(__file__).resolve().parent / "ui.html").read_text(encoding="utf-8")
 
 
 def serve(

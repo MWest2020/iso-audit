@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iso-audit — auditor</title>
+<style>
+  :root { --blue:#4376fc; --muted:#6a6a6a; --border:#e0e4ec; --soft:#f4f7ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+         color:#1a1a1a; max-width:1000px; margin:0 auto; padding:1.5rem; line-height:1.5; }
+  h1 { color:var(--blue); }
+  .step { border:1px solid var(--border); border-radius:8px; padding:1rem 1.2rem; margin:1rem 0; }
+  .step h2 { color:var(--blue); margin:0 0 .3rem; font-size:1.1rem; }
+  .step .num { background:var(--blue); color:#fff; border-radius:50%; padding:.1rem .55rem; margin-right:.4rem; }
+  button { background:var(--blue); color:#fff; border:0; border-radius:6px; padding:.4rem .8rem; cursor:pointer; }
+  button.alt { background:#fff; color:var(--blue); border:1px solid var(--blue); }
+  button.sev { padding:.15rem .5rem; font-size:.85rem; }
+  button.sev[aria-pressed="true"] { outline:2px solid #1a1a1a; }
+  table { border-collapse:collapse; width:100%; font-size:.9rem; margin-top:.5rem; }
+  th,td { border:1px solid var(--border); padding:.35rem .5rem; text-align:left; vertical-align:top; }
+  th { background:var(--soft); color:var(--blue); }
+  .out { background:var(--soft); border-left:3px solid var(--blue); padding:.5rem .8rem; margin-top:.5rem;
+         white-space:pre-wrap; font-size:.85rem; }
+  .note { color:var(--muted); font-style:italic; font-size:.85rem; }
+  input.reason { width:100%; border:1px solid var(--border); border-radius:4px; padding:.2rem; }
+  iframe { width:100%; height:520px; border:1px solid var(--border); border-radius:6px; margin-top:.5rem; }
+  .ok { color:#1a7d46; font-size:.8rem; }
+</style>
+</head>
+<body>
+<h1>iso-audit — auditor-flow</h1>
+<p class="note">Lokale tool. Vier stappen: landscape → run → triage → management-memo.</p>
+
+<div class="step">
+  <h2><span class="num">1</span>Landscape</h2>
+  <button onclick="landscape()">Laad landscape</button>
+  <div id="landscape-out" class="out" hidden></div>
+</div>
+
+<div class="step">
+  <h2><span class="num">2</span>Run</h2>
+  <button onclick="run()">Run (toon resultaat)</button>
+  <div id="run-out" class="out" hidden></div>
+</div>
+
+<div class="step">
+  <h2><span class="num">3</span>Triage <span class="note">— bevestig of pen om; append-only vastgelegd</span></h2>
+  <button onclick="loadFindings('NC')">Laad NC-kandidaten</button>
+  <button class="alt" onclick="loadFindings()">Toon alle findings</button>
+  <div id="triage-wrap"></div>
+</div>
+
+<div class="step">
+  <h2><span class="num">4</span>Management-memo</h2>
+  <button onclick="preview()">Genereer preview</button>
+  <button class="alt" onclick="exportPdf()">Exporteer PDF</button>
+  <span id="memo-msg" class="ok"></span>
+  <div id="memo-frame"></div>
+</div>
+
+<script>
+const SEV = ["NC","OFI","POSITIVE","UNCLASSIFIED"];
+const TRIAGE = ["te_verifieren","valide","nader_onderzoek"];
+const j = async (url,opts) => (await fetch(url,opts)).json();
+
+async function landscape(){
+  const d = await j("/landscape");
+  const el = document.getElementById("landscape-out");
+  el.hidden = false;
+  el.textContent =
+    `Geregistreerde bronnen: ${d.sources_registered.join(", ")}\n`+
+    `Normen: ${d.standards.join(", ")}\n`+
+    `Tellingen: ${JSON.stringify(d.counts)}\n`+
+    `Clausules met NC: ${d.clauses_with_nc.join(", ")}\n\n${d.note}`;
+}
+async function run(){
+  const d = await j("/run",{method:"POST"});
+  const el = document.getElementById("run-out");
+  el.hidden = false;
+  el.textContent = `Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}\n\n${d.note}`;
+}
+async function loadFindings(severity){
+  const fs = await j("/findings" + (severity ? "?severity="+severity : ""));
+  let rows = fs.map(f => `
+    <tr data-id="${f.id}">
+      <td>${f.title}</td><td>${f.clause}</td>
+      <td>${SEV.map(s=>`<button class="sev" aria-pressed="${f.severity===s}" onclick="setSev('${f.id}','${s}',this)">${s}</button>`).join(" ")}</td>
+      <td><select onchange="setTriage('${f.id}',this.value)">
+        ${TRIAGE.map(t=>`<option value="${t}" ${f.triage_status===t?"selected":""}>${t}</option>`).join("")}
+      </select></td>
+      <td><input class="reason" placeholder="reden (auditsessie)"></td>
+      <td class="ok"></td>
+    </tr>`).join("");
+  document.getElementById("triage-wrap").innerHTML =
+    `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function reasonFor(id){
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  return (tr.querySelector("input.reason").value || "auditsessie");
+}
+function flash(id){
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  tr.querySelector("td.ok").textContent = "✓ opgeslagen";
+}
+async function post(id,body){
+  await fetch(`/findings/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  flash(id);
+}
+async function setSev(id,sev,btn){
+  await post(id,{severity:sev,reason:reasonFor(id)});
+  btn.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b===btn));
+}
+async function setTriage(id,t){ await post(id,{triage_status:t,reason:reasonFor(id)}); }
+async function preview(){
+  document.getElementById("memo-frame").innerHTML = `<iframe src="/memo/preview"></iframe>`;
+}
+async function exportPdf(){
+  const d = await j("/memo/export",{method:"POST"});
+  document.getElementById("memo-msg").textContent = "PDF: "+d.pdf;
+}
+</script>
+</body>
+</html>

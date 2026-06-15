@@ -82,3 +82,29 @@ def test_memo_preview_rendert_html(tmp_path: Path) -> None:
     assert r.status_code == 200
     assert "Auditmemo" in r.text
     assert "Offboarding" in r.text
+
+
+def test_findings_severity_filter(tmp_path: Path) -> None:
+    r = _client(tmp_path).get("/findings", params={"severity": "NC"})
+    data = r.json()
+    assert [f["id"] for f in data] == ["f1"]  # alleen de NC
+
+
+def test_landscape(tmp_path: Path) -> None:
+    d = _client(tmp_path).get("/landscape").json()
+    assert "drive" in d["sources_registered"]  # registry
+    assert "6.5" in d["clauses_with_nc"]  # NC-clausule
+    assert d["counts"]["NC"] == 1
+
+
+def test_run_summary(tmp_path: Path) -> None:
+    d = _client(tmp_path).post("/run").json()
+    assert d["findings"] == 2
+    assert "note" in d
+
+
+def test_index_serveert_ui(tmp_path: Path) -> None:
+    r = _client(tmp_path).get("/")
+    assert r.status_code == 200
+    assert "auditor-flow" in r.text
+    assert "Triage" in r.text
