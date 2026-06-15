@@ -101,9 +101,19 @@ def create_app(session: AuditSession) -> FastAPI:
         """Stap 1: beschikbare normen + bronnen om de run te configureren."""
         return session.config_options()
 
+    @app.post("/run/start")
+    def run_start(pace: float = 0.05) -> dict[str, object]:
+        """Stap 2: indexeer + start de voortgangs-job (timer/ETA via /run/progress)."""
+        return session.start_run(pace_s=pace)
+
+    @app.get("/run/progress")
+    def run_progress() -> dict[str, object]:
+        """Voortgang stap 2: done/total + verstreken tijd + aftellende ETA."""
+        return session.run_progress()
+
     @app.post("/run")
     def run(config: RunConfig | None = None) -> dict[str, object]:
-        """Stap 2: voer/toon de run o.b.v. de gekozen normen + bronnen."""
+        """Stap 2: samenvatting (config + tellingen) — toon na afronden van de run."""
         c = config or RunConfig()
         return session.run_summary(norms=c.norms, sources=c.sources)
 

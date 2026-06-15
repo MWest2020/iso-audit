@@ -9,6 +9,9 @@ garantie: reclassificatie/triage wordt nooit overschreven, alleen toegevoegd.
 from __future__ import annotations
 
 import json
+import threading
+import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,6 +26,17 @@ from iso_audit.memo.theme.profile import Profile, laad_profiel
 
 class SessionError(ValueError):
     """Sessie kon niet geladen worden of een actie is ongeldig."""
+
+
+@dataclass
+class _RunState:
+    """Voortgang van de stap-2-run (indexatie + timer)."""
+
+    status: str = "idle"
+    total: int = 0
+    done: int = 0
+    start: float = 0.0
+    pace: float = 0.0
 
 
 class AuditSession:
@@ -44,6 +58,7 @@ class AuditSession:
         self._profile_ref = profile
         self._norms_dir = norms_dir
         self._memo_input_path = Path(memo_input_path)
+        self._run = _RunState()
 
     # --- findings + triage ---------------------------------------------------
 
@@ -129,6 +144,43 @@ class AuditSession:
         return {
             "norms": laad_norm_db(self._norms_dir).standards(),
             "sources": beschikbare_bronnen(),
+        }
+
+    def start_run(self, *, pace_s: float = 0.05) -> dict[str, object]:
+        """Stap 2: indexeer de items en start een voortgangs-job (met timer/ETA).
+
+        ``pace_s`` = seconden per item (demo-tempo). ``pace_s<=0`` draait synchroon
+        (voor tests). De echte live-ingest via een bron is de connector-fase.
+        """
+        total = len(self.findings())
+        self._run = _RunState(
+            status="running", total=total, done=0, start=time.monotonic(), pace=pace_s
+        )
+        if pace_s <= 0:
+            self._run.done = total
+            self._run.status = "done"
+        else:
+            threading.Thread(target=self._run_worker, daemon=True).start()
+        return {"total": total, "status": self._run.status}
+
+    def _run_worker(self) -> None:
+        run = self._run
+        for i in range(run.total):
+            time.sleep(run.pace)
+            run.done = i + 1
+        run.status = "done"
+
+    def run_progress(self) -> dict[str, object]:
+        """Voortgang van stap 2: done/total, verstreken tijd en aftellende ETA."""
+        r = self._run
+        elapsed = (time.monotonic() - r.start) if r.status != "idle" else 0.0
+        eta = (r.total - r.done) * (elapsed / r.done) if r.done and r.status == "running" else 0.0
+        return {
+            "status": r.status,
+            "total": r.total,
+            "done": r.done,
+            "elapsed_s": round(elapsed, 1),
+            "eta_s": round(eta, 1),
         }
 
     def run_summary(

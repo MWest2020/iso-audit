@@ -146,6 +146,22 @@ def test_run_zonder_body(tmp_path: Path) -> None:
     assert d["findings"] == 2
 
 
+def test_run_progress_synchroon(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    start = client.post("/run/start", params={"pace": 0}).json()  # pace 0 = synchroon
+    assert start == {"total": 2, "status": "done"}
+    p = client.get("/run/progress").json()
+    assert p["status"] == "done"
+    assert p["done"] == 2 and p["total"] == 2
+    assert "elapsed_s" in p and "eta_s" in p
+
+
+def test_run_progress_idle(tmp_path: Path) -> None:
+    p = _client(tmp_path).get("/run/progress").json()
+    assert p["status"] == "idle"
+    assert p["done"] == 0
+
+
 def test_index_serveert_ui(tmp_path: Path) -> None:
     r = _client(tmp_path).get("/")
     assert r.status_code == 200

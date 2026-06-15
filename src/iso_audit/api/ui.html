@@ -28,6 +28,8 @@
   input.reason { width:100%; border:1px solid var(--border); border-radius:4px; padding:.2rem; }
   iframe { width:100%; height:520px; border:1px solid var(--border); border-radius:6px; margin-top:.5rem; }
   .ok { color:#1a7d46; font-size:.8rem; }
+  #bar-wrap { background:var(--border); border-radius:6px; height:14px; margin:.5rem 0; overflow:hidden; }
+  #bar { background:var(--blue); height:100%; width:0; transition:width .3s; }
 </style>
 </head>
 <body onload="refreshGate()">
@@ -41,8 +43,10 @@
 </div>
 
 <div class="step">
-  <h2><span class="num">2</span>Run</h2>
-  <button onclick="run()">Run (toon resultaat)</button>
+  <h2><span class="num">2</span>Run <span class="note">— indexeert de bestanden, met timer + ETA</span></h2>
+  <button onclick="startRun()">Start run</button>
+  <div id="bar-wrap" hidden><div id="bar"></div></div>
+  <div id="run-progress" class="note" hidden></div>
   <div id="run-out" class="out" hidden></div>
 </div>
 
@@ -85,12 +89,27 @@ function selectedConfig(){
     sources:[...document.querySelectorAll(".cfg-src:checked")].map(e=>e.value)
   };
 }
-async function run(){
-  const d = await j("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(selectedConfig())});
-  const el = document.getElementById("run-out"); el.hidden = false;
-  el.textContent =
-    `Config — normen: ${d.config.norms.join(", ")||"(geen)"} · bronnen: ${d.config.sources.join(", ")||"(geen)"}\n`+
-    `Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}\n\n${d.note}`;
+async function startRun(){
+  const cfg = selectedConfig();
+  await fetch("/run/start",{method:"POST"});
+  const prog = document.getElementById("run-progress"); prog.hidden=false;
+  const barWrap = document.getElementById("bar-wrap"); barWrap.hidden=false;
+  const bar = document.getElementById("bar");
+  const poll = setInterval(async ()=>{
+    const p = await j("/run/progress");
+    const pct = p.total ? Math.round(100*p.done/p.total) : 0;
+    bar.style.width = pct + "%";
+    prog.textContent = `Indexatie: ${p.done}/${p.total} bestanden (${pct}%) · verstreken ${p.elapsed_s}s · resterend ~${p.eta_s}s`;
+    if(p.status==="done"){
+      clearInterval(poll);
+      prog.textContent = `Klaar: ${p.total} bestanden geïndexeerd in ${p.elapsed_s}s.`;
+      const d = await j("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+      const el = document.getElementById("run-out"); el.hidden=false;
+      el.textContent =
+        `Config — normen: ${d.config.norms.join(", ")||"(geen)"} · bronnen: ${d.config.sources.join(", ")||"(geen)"}\n`+
+        `Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}`;
+    }
+  }, 400);
 }
 async function loadFindings(severity){
   const fs = await j("/findings" + (severity ? "?severity="+severity : ""));
