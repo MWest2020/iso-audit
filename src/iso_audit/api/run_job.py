@@ -74,6 +74,10 @@ def run_live_pipeline(
     handler = _ProgressHandler(on_log)
     pijplijn_logger = logging.getLogger("iso_audit")
     pijplijn_logger.addHandler(handler)
+    # INFO-regels (de "Stap X/7"-voortgang) moeten de handler bereiken; default
+    # kan de logger op WARNING staan. Niveau tijdelijk verlagen + herstellen.
+    vorig_niveau = pijplijn_logger.level
+    pijplijn_logger.setLevel(logging.INFO)
     try:
         conn = verbinding()
         initialiseer(conn)
@@ -86,6 +90,7 @@ def run_live_pipeline(
         )
     finally:
         pijplijn_logger.removeHandler(handler)
+        pijplijn_logger.setLevel(vorig_niveau)
 
 
 def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> list[Finding]:
