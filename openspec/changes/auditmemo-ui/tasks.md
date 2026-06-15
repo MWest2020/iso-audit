@@ -7,15 +7,15 @@
 
 ## 0. Besluit & skeleton
 
-- [ ] 0.1 Stack bevestigen (FastAPI) + dep via `uv add`; lokaal-only bind (127.0.0.1)
-- [ ] 0.2 `iso-audit ui`/`serve`-command; bestand-gebaseerde sessie-working-dir
+- [x] 0.1 Stack bevestigd (FastAPI + uvicorn + httpx via `uv add`); lokaal-only bind (127.0.0.1)
+- [x] 0.2 `iso-audit ui`-command + `AuditSession` (bestand-gebaseerde working-dir met findings.json)
 
 ## 1. API — triage + memo (capability: audit-api)
 
-- [ ] 1.1 `GET /findings` — findings + huidige classificatie + triage-status
-- [ ] 1.2 `POST /findings/{id}` — reclassificeer (NC↔OFI) / zet triage-status, **append-only** in `decisions`/`classifications` (actor + timestamp + reden)
-- [ ] 1.3 `POST /memo` — `draft` + render → HTML-preview + PDF (zelfde resultaat als `iso-audit memo`)
-- [ ] 1.4 Tests: handlers met de motor gemockt; append-only-gedrag expliciet getest
+- [x] 1.1 `GET /findings` — findings + classificatie + triage-status (FindingSummary)
+- [x] 1.2 `POST /findings/{id}` — reclassificeer (NC↔OFI) / zet triage-status, **append-only** met actor + timestamp + reden. **Noot:** MVP schrijft naar een sessie-lokale `triage_log.jsonl` (append-only); integratie met de `decisions`/`classifications`-DB-tabellen is een follow-up
+- [x] 1.3 `GET /memo/preview` (HTML) + `POST /memo/export` (PDF) via de bestaande motor
+- [x] 1.4 Tests: TestClient — findings, reclassify NC→OFI append-only, trail groeit, 404, memo-preview (5 tests)
 
 ## 2. Frontend — triage + memo-review (capability: memo-ui)
 

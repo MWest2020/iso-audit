@@ -1,0 +1,84 @@
+"""Tests voor de auditor-API (`iso_audit.api`)."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from iso_audit.api.app import create_app
+from iso_audit.api.session import AuditSession
+
+_EX = Path("examples/auditmemo")
+_FINDINGS = [
+    {
+        "id": "f1",
+        "severity": "NC",
+        "standard": "iso-27001-2022",
+        "clause": "6.5",
+        "title": "Offboarding",
+        "description": "Offboarding niet aantoonbaar afgesloten.",
+        "triage_status": "te_verifieren",
+    },
+    {
+        "id": "f2",
+        "severity": "OFI",
+        "standard": "iso-9001-2015",
+        "clause": "10.2",
+        "title": "Effectiviteits-evaluatie",
+        "description": "Niet vastgelegd.",
+    },
+]
+
+
+def _client(tmp_path: Path) -> TestClient:
+    (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
+    session = AuditSession(
+        tmp_path,
+        profile=str(_EX / "conduction.profile.yaml"),
+        norms_dir="examples/norms",
+        memo_input_path=str(_EX / "memo-input.yaml"),
+    )
+    return TestClient(create_app(session))
+
+
+def test_get_findings(tmp_path: Path) -> None:
+    r = _client(tmp_path).get("/findings")
+    assert r.status_code == 200
+    ids = {f["id"] for f in r.json()}
+    assert ids == {"f1", "f2"}
+
+
+def test_reclassify_nc_naar_ofi_append_only(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    r = client.post("/findings/f1", json={"severity": "OFI", "reason": "bewijs in interview"})
+    assert r.status_code == 200
+    assert r.json()["severity"] == "OFI"
+    # trail bevat de override (append-only) met from/to + reden.
+    trail = client.get("/trail").json()
+    assert len(trail) == 1
+    assert trail[0]["field"] == "severity"
+    assert trail[0]["from"] == "NC" and trail[0]["to"] == "OFI"
+    assert trail[0]["reason"] == "bewijs in interview"
+
+
+def test_triage_status_append_groeit(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.post("/findings/f1", json={"severity": "OFI", "reason": "r1"})
+    client.post("/findings/f1", json={"triage_status": "nader_onderzoek", "reason": "r2"})
+    trail = client.get("/trail").json()
+    assert len(trail) == 2  # append-only: eerste blijft staan
+    assert trail[1]["field"] == "triage_status"
+
+
+def test_onbekende_finding_404(tmp_path: Path) -> None:
+    r = _client(tmp_path).post("/findings/zzz", json={"severity": "OFI", "reason": "x"})
+    assert r.status_code == 404
+
+
+def test_memo_preview_rendert_html(tmp_path: Path) -> None:
+    r = _client(tmp_path).get("/memo/preview")
+    assert r.status_code == 200
+    assert "Auditmemo" in r.text
+    assert "Offboarding" in r.text
