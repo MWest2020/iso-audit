@@ -1,0 +1,38 @@
+title: "Auditmemo — Interne audit<br>ISO 9001:2015 + 27001:2022"
+cycle: "Q2 2026"
+date: "06-05-2026"
+version: "v2"
+lead_summary: >
+  In de interne audit van mei 2026 zijn <strong>2 non-conformiteiten</strong>
+  geconstateerd en <strong>1 verbeterpunt</strong> op het gebied van logging. De
+  volledige bevindingen (297 kansen voor verbetering, 122 positieve bevindingen)
+  staan in het detail-rapport <em>Auditrapport_beide_v3.3_2026-05-05.pdf</em>.
+  Deze memo bevat enkel de punten die managementbesluit vragen.
+detail_report_ref: "output/audit_reports/Auditrapportage v3.3 2026-05-05/"
+context:
+  audit_cycle: >
+    Deze interne audit is onderdeel van het auditprogramma 2026 — interne audit
+    Q2 2026, voorafgaand aan de aankomende externe surveillance.
+  scope:
+    "ISO 9001:2015": "§4 t/m §10 (context, leiderschap, planning, ondersteuning, uitvoering, evaluatie, verbetering)"
+    "ISO 27001:2022": "§4 t/m §10 inclusief Annex A-beheersmaatregelen (organisatorisch, persoon, fysiek, technologisch)"
+  sources:
+    - "Google Drive — KMS- en ISMS-documentatie, afwijkingen- en incidentmemo's, reactiedocumenten op eerdere externe controles."
+    - "Miro-bord (audit-interview) — kwalitatieve input van betrokkenen per ISO-hoofdstuk."
+    - "Aanvullend interview met procesverantwoordelijken voor data buiten Drive/Miro (zie voorbehoud)."
+  dataset_counts:
+    NC: 2
+    OFI: 297
+    positief: 122
+    "niet-geclassificeerd": 15
+  scope_caveat: >
+    De audit-tool had toegang tot Google Drive en Miro. Operationele systemen
+    waarin status- en procestracking feitelijk plaatsvindt — Jira, Google
+    Calendar, Notion en Slack — vielen buiten toolscope. De zwaarder wegende
+    bevindingen zijn aanvullend geverifieerd via interview met de
+    procesverantwoordelijken.
+  independence_caveat: >
+    De interne auditor combineert deze rol met operationele verantwoordelijkheden
+    (teamlead) binnen Conduction — een rolconflict in de zin van ISO 19011
+    §6.4.2. Mitigaties zijn vastgelegd in §6.5 van het detail-rapport.
+  discussion: "Besproken op 6 mei 2026 met de hoofd ISO. Vervolgbespreking gepland in eerstvolgende managementbespreking."

@@ -1,0 +1,27 @@
+schema_version: 1
+entries:
+  - id: ext-2023
+    source_audit: "Externe controle audits 2023 — observaties O-2023-01 t/m O-2023-03"
+    source_document: "Reactie en acties nav 1e controle audits 9001 en 27001"
+    finding_summary: "observaties externe controle 2023"
+    status: closed
+    closed_date: "mei 2024"
+    closed_evidence: "OGSM-invoering, Jira-flow, auditprogramma-aanscherping"
+  - id: ext-2024
+    source_audit: "Externe controle audit juli 2024 — opvolgingsbevindingen"
+    source_document: "Reactie en acties nav 2e controle audits juli 2024"
+    finding_summary: "opvolgingsbevindingen"
+    status: closed
+    closed_evidence: "afwijkingenmemo Sarai destijds in afhandeling (opgevolgd in deze memo, NC 2)"
+  - id: int-v33-nc1
+    source_audit: "Interne audit v3.3 (mei 2026) — NC#1: lessons-learned na incidenten (ISO 27001 §5.27)"
+    source_document: "Auditrapport_beide_v3.3_2026-05-05"
+    finding_summary: "lessons-learned na incidenten"
+    status: in_progress
+    closed_evidence: "corrigerende actie in gang; memo Thijn opgenomen in NC 1 van deze memo"
+  - id: int-v33-nc2
+    source_audit: "Interne audit v3.3 (mei 2026) — NC#2: offboarding (ISO 27001 §6.5)"
+    source_document: "Auditrapport_beide_v3.3_2026-05-05"
+    finding_summary: "offboarding"
+    status: in_progress
+    closed_evidence: "opgevolgd in deze memo (NC 2) — patroon bevestigd door casus Goya"

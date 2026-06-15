@@ -31,6 +31,13 @@ class Finding(BaseModel):
     extra_clauses: list[str] = Field(default_factory=list)  # extra geciteerde clausules
     source_memo: str | None = None
     promote_to_improvement: bool = False
+    # Optionele, auditor-geleverde redactie voor de memo. Afwezig → builder
+    # gebruikt `description` als afwijking en toont placeholders.
+    deviation: str | None = None
+    corrective_measure: str | None = None
+    actions: list[ActionRow] = Field(default_factory=list)
+    classification_rationale: str | None = None  # voor verbeterpunten
+    suggestion: str | None = None
 
 
 class HistoricalNC(BaseModel):
@@ -99,6 +106,18 @@ class MemoContext(BaseModel):
     discussion: str | None = None  # datum + met wie; None = placeholder
 
 
+class MemoInput(BaseModel):
+    """Auditor-geleverde memo-koptekst + context (los van de findings-dataset)."""
+
+    title: str
+    cycle: str  # bv. "Q2 2026" — verschijnt in subtitle
+    date: str
+    version: str
+    lead_summary: str
+    detail_report_ref: str
+    context: MemoContext
+
+
 class AuditMemo(BaseModel):
     """Top-level render-model: alles wat de template nodig heeft."""
 
@@ -112,3 +131,10 @@ class AuditMemo(BaseModel):
     improvements: list[ImprovementBlock]
     historical_ncs: list[HistoricalNC]
     detail_report_ref: str
+    # Audit-trail: profile-slug/-versie, tool-versie, render-timestamp,
+    # findings-dataset-hash. Onzichtbaar als HTML-comment in de output.
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+# Finding verwijst vooruit naar ActionRow (hierboven gedefinieerd) → resolve.
+Finding.model_rebuild()

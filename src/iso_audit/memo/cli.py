@@ -1,0 +1,133 @@
+"""Typer-CLI: ``iso-audit memo`` + ``iso-audit profile``.
+
+Dunne schil boven builder/renderer/profile-loader. Boring & auditable: expliciete
+paden, heldere fouten, geen stille fallback.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, NoReturn
+
+import typer
+import yaml
+from rich.console import Console
+
+from iso_audit.memo.builder import build_memo
+from iso_audit.memo.models import Finding, HistoricalNC, MemoInput
+from iso_audit.memo.norm_lookup import laad_norm_db
+from iso_audit.memo.renderer.html import MemoRendererImpl
+from iso_audit.memo.theme.profile import ProfileError, laad_profiel
+
+app = typer.Typer(help="Auditmemo-generatie en profielbeheer.", no_args_is_help=True)
+profile_app = typer.Typer(
+    help="Profielbeheer (branding/auditor/standaarden).", no_args_is_help=True
+)
+app.add_typer(profile_app, name="profile")
+_console = Console()
+
+
+def _fail(msg: str) -> NoReturn:
+    _console.print(f"[red]fout:[/red] {msg}")
+    raise typer.Exit(code=1)
+
+
+def _laad_findings(pad: Path) -> list[Finding]:
+    data = json.loads(pad.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        _fail(f"{pad}: verwacht een JSON-lijst van findings.")
+    return [Finding(**item) for item in data]
+
+
+def _laad_yaml_lijst(pad: Path, key: str) -> list[dict[str, Any]]:
+    data = yaml.safe_load(pad.read_text(encoding="utf-8")) or {}
+    entries = data.get(key, [])
+    if not isinstance(entries, list):
+        _fail(f"{pad}: '{key}' moet een lijst zijn.")
+    return list(entries)
+
+
+@app.command("memo")
+def memo_cmd(
+    profile: str = typer.Option(..., "--profile", help="Profiel-slug of pad."),
+    findings: Path = typer.Option(..., "--findings", help="Findings-dataset (JSON)."),
+    memo_input: Path = typer.Option(..., "--memo-input", help="Memo-koptekst + context (YAML)."),
+    norms: Path = typer.Option(..., "--norms", help="Directory met norm-DB <slug>.yaml."),
+    output: Path = typer.Option(..., "--output", help="Output-basispad (zonder extensie)."),
+    historical_ncs: Path | None = typer.Option(
+        None, "--historical-ncs", help="Historical-NCs (YAML)."
+    ),
+    language: str | None = typer.Option(None, "--language", help="Taal (default: profiel)."),
+    threshold: int = typer.Option(10, "--threshold", help="OFI-cluster-drempel voor verbeterpunt."),
+) -> None:
+    """Genereer de management-auditmemo (HTML + PDF) uit de findings-dataset."""
+    try:
+        prof = laad_profiel(profile)
+        norm_db = laad_norm_db(norms)
+        finding_list = _laad_findings(findings)
+        mi = MemoInput(**(yaml.safe_load(memo_input.read_text(encoding="utf-8")) or {}))
+        hist = (
+            [HistoricalNC(**e) for e in _laad_yaml_lijst(historical_ncs, "entries")]
+            if historical_ncs
+            else []
+        )
+        memo = build_memo(
+            findings=finding_list,
+            historical_ncs=hist,
+            profile=prof,
+            norm_db=norm_db,
+            memo_input=mi,
+            language=language,
+            threshold=threshold,
+        )
+        renderer = MemoRendererImpl()
+        html = renderer.render_html(memo, prof)
+    except (ProfileError, ValueError, OSError) as exc:
+        _fail(str(exc))
+
+    html_pad = output.with_suffix(".html")
+    html_pad.parent.mkdir(parents=True, exist_ok=True)
+    html_pad.write_text(html, encoding="utf-8")
+    pdf_pad = output.with_suffix(".pdf")
+    renderer.render_pdf(html, pdf_pad)
+    _console.print(f"[green]memo geschreven:[/green] {html_pad} + {pdf_pad}")
+
+
+@profile_app.command("list")
+def profile_list() -> None:
+    """Toon alle profielen in de XDG-locatie."""
+    from iso_audit.memo.theme.profile import _profiles_dir
+
+    base = _profiles_dir()
+    if not base.is_dir():
+        _console.print("(geen profielen)")
+        return
+    for pad in sorted(base.glob("*.yaml")):
+        try:
+            p = laad_profiel(pad.stem)
+            _console.print(f"{p.slug:20} {p.organization.name}")
+        except ProfileError as exc:
+            _console.print(f"{pad.stem:20} [red]ongeldig: {exc}[/red]")
+
+
+@profile_app.command("show")
+def profile_show(slug: str = typer.Argument(..., help="Profiel-slug of pad.")) -> None:
+    """Toon een profiel (zonder de logo-SVG-blob)."""
+    try:
+        p = laad_profiel(slug)
+    except ProfileError as exc:
+        _fail(str(exc))
+    dump = p.model_dump()
+    dump["brand"]["logo_svg"] = f"<svg … {len(p.brand.logo_svg)} tekens>"
+    _console.print(yaml.safe_dump(dump, allow_unicode=True, sort_keys=False))
+
+
+@profile_app.command("validate")
+def profile_validate(slug: str = typer.Argument(..., help="Profiel-slug of pad.")) -> None:
+    """Valideer een profiel (schema-versie, kleuren, SVG-veiligheid)."""
+    try:
+        laad_profiel(slug)
+    except ProfileError as exc:
+        _fail(str(exc))
+    _console.print("[green]profiel is geldig[/green]")

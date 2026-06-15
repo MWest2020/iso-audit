@@ -392,6 +392,14 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
         datefmt="%H:%M:%S",
     )
+    # memo/profile draaien als Typer-subapp achter dezelfde console-script.
+    args_list = list(sys.argv[1:] if argv is None else argv)
+    if args_list and args_list[0] in ("memo", "profile"):
+        from iso_audit.memo.cli import app as memo_app
+
+        memo_app(args_list)  # Typer/click handelt zelf de exit af
+        return 0
+
     parser = _build_parser()
     args = parser.parse_args(argv)
     return int(args.func(args))

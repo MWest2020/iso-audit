@@ -73,6 +73,9 @@ ignore = []
 # make_pptx.py is een hardcoded MT-snapshot waarbij de presentatie-tekst
 # verbatim moet blijven — line-breaking zou de inhoud wijzigen.
 "src/iso_audit/reporting/make_pptx.py" = ["E501"]
+# Typer vereist typer.Option/Argument-aanroepen in argument-defaults (B008 is
+# hier een bekende false-positive); E501 voor de option-helpregels.
+"src/iso_audit/memo/cli.py" = ["B008", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"

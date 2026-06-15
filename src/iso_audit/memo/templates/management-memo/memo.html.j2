@@ -49,6 +49,7 @@
 </style>
 </head>
 <body>
+{% if memo.metadata %}<!-- audit-trail {% for k, v in memo.metadata.items() %}{{ k }}={{ v }} {% endfor %}-->{% endif %}
 
 <div class="cover">
   <h1>{{ memo.title | safe }}</h1>

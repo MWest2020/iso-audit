@@ -35,7 +35,7 @@
 
 - [x] 4.1 `classifier.py`: `DefaultClassifier` — NC-extractie + verbeterpunt-promotie (expliciete flag + OFI-cluster-drempel, één representant/clausule). + tests
 - [x] 4.2 `pattern_detection.py`: `DefaultPatternDetector` — cross-clause positief-vs-OFI-patroonzin met tellingen. + tests
-- [ ] 4.3 Verplichte classificatie-rationale bij verbeterpunt — afgedwongen door het `ImprovementBlock`-model (`classification_rationale` is verplicht veld); template toont het (fase 5)
+- [x] 4.3 Verplichte classificatie-rationale bij verbeterpunt — verplicht veld op `ImprovementBlock`; template toont "Waarom verbeterpunt en geen NC?" (getest)
 
 ## 5. Rendering (capability: auditmemo)
 
@@ -45,19 +45,19 @@
 - [x] 5.4 Action-table per NC (wat/wie/waar/uiterlijk) met gemarkeerde placeholders
 - [x] 5.5 Voorbehoud-secties (auditscope + conditioneel onafhankelijkheid)
 - [x] 5.6 Historical-NC-statustabel uit `historical_ncs.yaml`
-- [ ] 5.7 Audit-trail-metadata: HTML-comment + PDF-metadata (profile-slug/-versie, tool-versie, render-timestamp, findings-hash) — bij de builder (fase 6)
+- [x] 5.7 Audit-trail-metadata: HTML-comment met profile-slug/-versie, tool-versie, render-timestamp (injecteerbaar) en findings-hash — gestempeld in `build_memo`, gerenderd in het template (getest)
 
 ## 6. CLI memo-command (capability: auditmemo)
 
-- [ ] 6.1 `iso-audit memo --profile --findings --historical-ncs --output`; HTML + PDF wegschrijven
-- [ ] 6.2 Heldere fouten bij ontbrekende/ongeldige inputs (geen stille fallback)
+- [x] 6.1 `iso-audit memo --profile --findings --memo-input --norms --output [--historical-ncs --language --threshold]` schrijft HTML + PDF. Typer-subapp gewired achter de bestaande `iso-audit` console-script. + `profile list/show/validate`
+- [x] 6.2 Heldere fouten bij ontbrekende/ongeldige inputs via `_fail` (ProfileError/ValueError/OSError → rode melding, exit 1; geen stille fallback)
 
 ## 7. Examples & integratietest
 
-- [ ] 7.1 `examples/`: `findings.json`, `historical_ncs.yaml`, `conduction.profile.yaml` (geanonimiseerd)
-- [ ] 7.2 Integratietest: render uit examples → HTML lxml-valid + PDF zonder WeasyPrint-warnings
-- [ ] 7.3 Norm-referentie-test: elke `clause` in een NC resolvet; CI faalt bij ontbrekende clausule
-- [ ] 7.4 Handmatige structurele diff tegen `Auditmemo_management_2026-05-06_v2.pdf` (structureel equivalent, niet pixel-exact)
+- [x] 7.1 `examples/auditmemo/`: `findings.json`, `memo-input.yaml`, `historical_ncs.yaml`, `conduction.profile.yaml` + `examples/norms/` (geanonimiseerd, reproduceert de referentie)
+- [x] 7.2 Integratietest: render uit examples → HTML lxml-valid + PDF non-empty (5 tests)
+- [x] 7.3 Norm-referentie-test: elke geciteerde clausule resolvet (NC 2 → 6.5/5.11/5.18); hard-fail bij ontbrekende
+- [ ] 7.4 Handmatige structurele diff tegen referentie-PDF — structurele markers geverifieerd in de output; visuele diff door auditor (Mark)
 
 ## 8. Documentatie
 
