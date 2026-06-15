@@ -33,9 +33,9 @@
 
 ## 4. Classificatie & patronen (capability: auditmemo)
 
-- [ ] 4.1 `classifier.py`: NC-extractie (`severity == "NC"`) + verbeterpunt-promotie (drempel + `promote_to_improvement`)
-- [ ] 4.2 `pattern_detection.py`: cross-clause positief-vs-OFI-patroon → zin in NC-context
-- [ ] 4.3 Verplichte classificatie-rationale bij verbeterpunt ("waarom verbeterpunt en geen NC?")
+- [x] 4.1 `classifier.py`: `DefaultClassifier` — NC-extractie + verbeterpunt-promotie (expliciete flag + OFI-cluster-drempel, één representant/clausule). + tests
+- [x] 4.2 `pattern_detection.py`: `DefaultPatternDetector` — cross-clause positief-vs-OFI-patroonzin met tellingen. + tests
+- [ ] 4.3 Verplichte classificatie-rationale bij verbeterpunt — afgedwongen door het `ImprovementBlock`-model (`classification_rationale` is verplicht veld); template toont het (fase 5)
 
 ## 5. Rendering (capability: auditmemo)
 
