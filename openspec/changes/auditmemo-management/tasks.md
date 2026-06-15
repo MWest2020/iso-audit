@@ -61,7 +61,7 @@
 
 ## 8. Documentatie
 
-- [ ] 8.1 README-sectie: memo-workflow + profile-workflow
-- [ ] 8.2 `docs/memo-architecture.md`: long-term ontwerpconcepten + uitbreidings-hooks (voor opvolgers / consultancy-klanten)
-- [ ] 8.3 `ONBOARDING.md` + `CHANGELOG.md` bijwerken in dezelfde commit als de code
-- [ ] 8.4 Bevestig: elke file ≤ 200 regels (templates uitgezonderd, gesplitst in partials)
+- [x] 8.1 README-sectie "Management-auditmemo": memo- + profile-workflow
+- [x] 8.2 `docs/memo-architecture.md`: lagen, ontwerpprincipes, uitbreidings-hooks-tabel, veiligheid
+- [x] 8.3 `ONBOARDING.md` (mappentabel) + `CHANGELOG.md` bijgewerkt
+- [x] 8.4 Bevestigd: alle `.py` in `memo/` ≤ 200 regels (max 153); templates gesplitst in partials

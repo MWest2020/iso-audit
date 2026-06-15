@@ -43,6 +43,35 @@ stap in **[`MEMORY.md`](MEMORY.md)**.
 - **[`docs/sinks/`](docs/sinks/)** — schrijf-adapters
 - **[`docs/notifiers/`](docs/notifiers/)** — handoff-kanalen (slack, email, teams, mattermost)
 - **[`docs/modes.md`](docs/modes.md)** — autonoom vs integer en de zeven beslispunten
+- **[`docs/memo-architecture.md`](docs/memo-architecture.md)** — auditmemo-feature + uitbreidings-hooks
+
+## Management-auditmemo
+
+`iso-audit memo` genereert de **management-one-pager** (HTML + PDF) uit de
+findings-dataset: alleen de NC's en verbeterpunten die een managementbesluit
+vragen, met genormeerde citaten, voorbehouden, action-tables en de status van
+eerder geconstateerde NC's. Multi-tenant via **profielen**; normen als
+**user-pointed plug-in** (de repo bevat geen norm-content).
+
+```bash
+# Profiel aanmaken (interactief) of een bestaande YAML gebruiken:
+uv run iso-audit profile new
+uv run iso-audit profile validate <slug>
+
+# Memo genereren uit de findings-dataset:
+uv run iso-audit memo \
+  --profile <slug-of-pad> \
+  --findings findings.json \
+  --memo-input memo-input.yaml \
+  --historical-ncs historical_ncs.yaml \
+  --norms <pad-naar-norm-DB> \
+  --output output/memo
+```
+
+Werkend voorbeeld in [`examples/auditmemo/`](examples/auditmemo/) (+ NL-
+voorbeeld-norm-DB in [`examples/norms/`](examples/norms/)). De officiële (en
+Engelstalige) norm-teksten levert de gebruiker zelf aan — de tool verzint nooit
+een norm-citaat.
 
 ## Ontwikkeling
 

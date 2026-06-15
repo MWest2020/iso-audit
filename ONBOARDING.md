@@ -78,6 +78,7 @@ De drie lagen volgen alle drie **hetzelfde registry-patroon** — zie
 | `src/iso_audit/miro/` | Miro-ingest — **READ-only** (write-flow verwijderd, zie CLAUDE.md) |
 | `src/iso_audit/store.py` | SQLite-laag: `verbinding()`, `initialiseer()`, `upsert_*` |
 | `src/iso_audit/interview.py` | Interactieve auditor-interview (§7) |
+| `src/iso_audit/memo/` | `iso-audit memo` + `profile` — management-auditmemo (HTML+PDF) uit findings; profielen + user-pointed norm-DB. Zie `docs/memo-architecture.md` |
 | `openspec/` | Specs + changes; werkwijze in CLAUDE.md |
 
 ## 5. Veelgebruikte commando's

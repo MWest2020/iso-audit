@@ -6,6 +6,29 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-15 — `iso-audit memo`: management-auditmemo uit findings
+
+Change `auditmemo-management` (MVP). Genereert de management-one-pager
+(HTML + PDF) uit de findings-dataset; status: code + tests klaar, handmatige
+visuele diff tegen het referentie-PDF + security-review nog open.
+
+- **`iso_audit/memo/`** (nieuw): `models` (pydantic v2), `protocols` (5
+  interfaces), `classifier` + `pattern_detection`, `norm_lookup` (user-pointed
+  norm-DB, hard-fail bij ontbrekende clausule/taal), `theme/` (profielsysteem
+  + SVG-validator + wizard), `renderer/` (Jinja2 → WeasyPrint), `builder`
+  (assemblage + audit-trail-metadata), `cli` (Typer-subapp).
+- **CLI**: `iso-audit memo` + `iso-audit profile new/list/show/validate`,
+  gewired achter de bestaande console-script. Nieuwe deps: typer, rich,
+  pydantic, jinja2, weasyprint.
+- **Multi-tenant profielen** (standalone YAML, inline SVG-logo, kleurpalet met
+  afgeleide defaults, schema-versioning) + **lean, user-pointed norm-DB** (repo
+  ship alleen een NL-voorbeeld; officiële/EN-teksten levert de gebruiker).
+- **Examples**: `examples/auditmemo/` + `examples/norms/` reproduceren de
+  referentie-memo (2 NC + verbeterpunt + historical).
+- Tests: 44 (incl. integratie: HTML lxml-valid, PDF, norm-resolutie,
+  audit-trail). Alle files ≤ 200 regels. ruff/format/mypy --strict schoon.
+- Docs: `docs/memo-architecture.md` + README-sectie + ONBOARDING.
+
 ### Added — 2026-06-15 — rapport-taal: versie-prompts, SMART-aanbevelingen, gate, --report-only
 
 Change `audit-rapport-management-taal` (gated op akkoord kwaliteitsmanagement
