@@ -1,0 +1,67 @@
+# Tasks — auditmemo-management
+
+> Stack: Python 3.12, `uv`, pydantic v2, typer+rich, jinja2, weasyprint, PyYAML
+> (`safe_load`). Max 200 regels per file. Interfaces in `protocols.py`.
+> `/review` na elke task; `/security-review` na config-lezende tasks.
+
+## 0. Voorbereiding
+
+- [ ] 0.1 Deps toevoegen via `uv add` (typer, rich, pydantic, jinja2, weasyprint); `uv.lock` committen; WeasyPrint systeem-libs (pango/cairo) documenteren in README
+- [ ] 0.2 Beslis CLI-integratie argparse ↔ Typer: `memo`/`profile` als Typer-subapp achter de bestaande `iso-audit` console-script (design.md "Niet opgelost")
+- [ ] 0.3 `iso_audit/memo/`-skeleton + `protocols.py` met `MemoRenderer`, `NormLookup`, `FindingsClassifier`, `ProfileLoader`, `PatternDetector`
+
+## 1. Models & contracten
+
+- [ ] 1.1 `models.py`: pydantic v2 `Finding`, `HistoricalNC`, `MemoContext`, `MemoActionRow` (zie design.md schema's)
+- [ ] 1.2 Findings-input loader (`examples/findings.json`-contract); validatie + duidelijke fouten
+
+## 2. Norm-database (capability: norm-database)
+
+- [ ] 2.1 `norm_lookup.py`: laad `data/norms/<slug>.yaml` (plug-in; ook user-pad), `safe_load`
+- [ ] 2.2 Meertalige lookup (NL/EN) per clausule; hard-fail bij ontbrekende clausule
+- [ ] 2.3 `data/norms/iso-9001-2015.yaml` + `iso-27001-2022.yaml` met minimaal de referentie-clausules (4.4, 5.11, 5.18, 5.24, 5.27, 6.3, 6.5, 8.13, 8.15, 8.16, 10.1, 10.2)
+- [ ] 2.4 `/security-review`: `safe_load`, geen path-traversal op user-pad
+
+## 3. Profielsysteem (capability: memo-profiles)
+
+- [ ] 3.1 `theme/profile.py`: Profile-model + loader, `schema_version`-check, kleurpalet met afgeleide defaults, hex-validatie
+- [ ] 3.2 `theme/svg_validator.py`: weiger `<script>`/`<foreignObject>`/externe `<image>`
+- [ ] 3.3 `theme/elicitation.py`: first-run wizard (8 stappen), opslaan naar XDG-locatie
+- [ ] 3.4 `cli.py`: `profile new/list/show/validate`; `--profile <path>` met traversal-guard
+- [ ] 3.5 `data/profiles/conduction.example.yaml` + `minimal.example.yaml`
+- [ ] 3.6 `/security-review`: SVG-validator, path-traversal, `safe_load`
+
+## 4. Classificatie & patronen (capability: auditmemo)
+
+- [ ] 4.1 `classifier.py`: NC-extractie (`severity == "NC"`) + verbeterpunt-promotie (drempel + `promote_to_improvement`)
+- [ ] 4.2 `pattern_detection.py`: cross-clause positief-vs-OFI-patroon → zin in NC-context
+- [ ] 4.3 Verplichte classificatie-rationale bij verbeterpunt ("waarom verbeterpunt en geen NC?")
+
+## 5. Rendering (capability: auditmemo)
+
+- [ ] 5.1 `templates/management-memo/`: `memo.html.j2` + partials (cover, context, nc, improvement, historical) — print-CSS A4, palette-variabelen, inline SVG, `.placeholder`-styling (uit referentie-HTML)
+- [ ] 5.2 `renderer/html.py`: Jinja2-wrapper; injecteer profiel-palette + font-stack + logo
+- [ ] 5.3 `renderer/pdf.py`: WeasyPrint-wrapper; self-contained (geen externe assets)
+- [ ] 5.4 Action-table per NC (wat/wie/waar/uiterlijk) met gemarkeerde placeholders
+- [ ] 5.5 Voorbehoud-secties (auditscope + conditioneel onafhankelijkheid)
+- [ ] 5.6 Historical-NC-statustabel uit `historical_ncs.yaml`
+- [ ] 5.7 Audit-trail-metadata: HTML-comment + PDF-metadata (profile-slug/-versie, tool-versie, render-timestamp, findings-hash)
+
+## 6. CLI memo-command (capability: auditmemo)
+
+- [ ] 6.1 `iso-audit memo --profile --findings --historical-ncs --output`; HTML + PDF wegschrijven
+- [ ] 6.2 Heldere fouten bij ontbrekende/ongeldige inputs (geen stille fallback)
+
+## 7. Examples & integratietest
+
+- [ ] 7.1 `examples/`: `findings.json`, `historical_ncs.yaml`, `conduction.profile.yaml` (geanonimiseerd)
+- [ ] 7.2 Integratietest: render uit examples → HTML lxml-valid + PDF zonder WeasyPrint-warnings
+- [ ] 7.3 Norm-referentie-test: elke `clause` in een NC resolvet; CI faalt bij ontbrekende clausule
+- [ ] 7.4 Handmatige structurele diff tegen `Auditmemo_management_2026-05-06_v2.pdf` (structureel equivalent, niet pixel-exact)
+
+## 8. Documentatie
+
+- [ ] 8.1 README-sectie: memo-workflow + profile-workflow
+- [ ] 8.2 `docs/memo-architecture.md`: long-term ontwerpconcepten + uitbreidings-hooks (voor opvolgers / consultancy-klanten)
+- [ ] 8.3 `ONBOARDING.md` + `CHANGELOG.md` bijwerken in dezelfde commit als de code
+- [ ] 8.4 Bevestig: elke file ≤ 200 regels (templates uitgezonderd, gesplitst in partials)
