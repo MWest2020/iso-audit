@@ -122,30 +122,26 @@ class AuditSession:
             telling[f.severity] = telling.get(f.severity, 0) + 1
         return telling
 
-    def landscape(self) -> dict[str, object]:
-        """Stap 1: dekking en gaps — welke bronnen/normen/clausules in beeld zijn."""
+    def config_options(self) -> dict[str, list[str]]:
+        """Stap 1: keuzes voor de run — beschikbare normen (norm-DB) en bronnen."""
         from iso_audit.ingest import beschikbare_bronnen
 
-        fs = self.findings()
         return {
-            "sources_registered": beschikbare_bronnen(),
-            "standards": sorted({f.standard for f in fs}),
-            "counts": self.counts(),
-            "clauses_with_nc": sorted({f.clause for f in fs if f.severity == "NC"}),
-            "note": (
-                "Niet-gekoppelde bronnen (bv. Jira/Calendar/Notion) vallen buiten "
-                "tool-scope; gaps daar vereisen handmatige verificatie in de auditsessie."
-            ),
+            "norms": laad_norm_db(self._norms_dir).standards(),
+            "sources": beschikbare_bronnen(),
         }
 
-    def run_summary(self) -> dict[str, object]:
-        """Stap 2: samenvatting van de (geladen) run-output."""
+    def run_summary(
+        self, *, norms: list[str] | None = None, sources: list[str] | None = None
+    ) -> dict[str, object]:
+        """Stap 2: voer (of toon) de run o.b.v. de gekozen config."""
         return {
+            "config": {"norms": norms or [], "sources": sources or []},
             "findings": len(self.findings()),
             "counts": self.counts(),
             "note": (
-                "Findings geladen uit de sessie (resultaat van een eerdere run). "
-                "Live source-trigger via een connector is de connector-orchestration-fase."
+                "Findings uit de sessie (resultaat van een eerdere run). Live ingest "
+                "via de gekozen bron(nen) is de connector-orchestration-fase."
             ),
         }
 

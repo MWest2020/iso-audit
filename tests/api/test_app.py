@@ -125,17 +125,25 @@ def test_findings_severity_filter(tmp_path: Path) -> None:
     assert [f["id"] for f in data] == ["f1"]  # alleen de NC
 
 
-def test_landscape(tmp_path: Path) -> None:
-    d = _client(tmp_path).get("/landscape").json()
-    assert "drive" in d["sources_registered"]  # registry
-    assert "6.5" in d["clauses_with_nc"]  # NC-clausule
-    assert d["counts"]["NC"] == 1
+def test_config_options(tmp_path: Path) -> None:
+    d = _client(tmp_path).get("/config/options").json()
+    assert "iso-9001-2015" in d["norms"] and "iso-27001-2022" in d["norms"]
+    assert "drive" in d["sources"]  # registry
 
 
-def test_run_summary(tmp_path: Path) -> None:
-    d = _client(tmp_path).post("/run").json()
+def test_run_met_config(tmp_path: Path) -> None:
+    d = (
+        _client(tmp_path)
+        .post("/run", json={"norms": ["iso-9001-2015"], "sources": ["drive"]})
+        .json()
+    )
     assert d["findings"] == 2
-    assert "note" in d
+    assert d["config"]["sources"] == ["drive"]
+
+
+def test_run_zonder_body(tmp_path: Path) -> None:
+    d = _client(tmp_path).post("/run").json()  # body optioneel
+    assert d["findings"] == 2
 
 
 def test_index_serveert_ui(tmp_path: Path) -> None:

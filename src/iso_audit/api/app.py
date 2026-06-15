@@ -28,6 +28,13 @@ class TriageUpdate(BaseModel):
     reason: str = ""
 
 
+class RunConfig(BaseModel):
+    """Stap 1-config: welke normen + bronnen in de run-scope."""
+
+    norms: list[str] = []
+    sources: list[str] = []
+
+
 class FindingSummary(BaseModel):
     id: str
     severity: Severity
@@ -89,15 +96,16 @@ def create_app(session: AuditSession) -> FastAPI:
         """De append-only triage-trail (auditor-beslissingen)."""
         return session.trail()
 
-    @app.get("/landscape")
-    def landscape() -> dict[str, object]:
-        """Stap 1: dekking en gaps."""
-        return session.landscape()
+    @app.get("/config/options")
+    def config_options() -> dict[str, list[str]]:
+        """Stap 1: beschikbare normen + bronnen om de run te configureren."""
+        return session.config_options()
 
     @app.post("/run")
-    def run() -> dict[str, object]:
-        """Stap 2: samenvatting van de (geladen) run-output."""
-        return session.run_summary()
+    def run(config: RunConfig | None = None) -> dict[str, object]:
+        """Stap 2: voer/toon de run o.b.v. de gekozen normen + bronnen."""
+        c = config or RunConfig()
+        return session.run_summary(norms=c.norms, sources=c.sources)
 
     @app.get("/triage/status")
     def triage_status() -> dict[str, object]:

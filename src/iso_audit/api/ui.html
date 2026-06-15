@@ -35,9 +35,9 @@
 <p class="note">Lokale tool. Vier stappen: landscape → run → triage → management-memo.</p>
 
 <div class="step">
-  <h2><span class="num">1</span>Landscape</h2>
-  <button onclick="landscape()">Laad landscape</button>
-  <div id="landscape-out" class="out" hidden></div>
+  <h2><span class="num">1</span>Configuratie <span class="note">— kies normen + bronnen voor de run</span></h2>
+  <button onclick="loadConfig()">Laad opties</button>
+  <div id="config-form" class="out" hidden></div>
 </div>
 
 <div class="step">
@@ -69,21 +69,28 @@ const SEV = ["NC","OFI","POSITIVE"];
 const TRIAGE = ["open","valide","niet_valide"];
 const j = async (url,opts) => (await fetch(url,opts)).json();
 
-async function landscape(){
-  const d = await j("/landscape");
-  const el = document.getElementById("landscape-out");
-  el.hidden = false;
-  el.textContent =
-    `Geregistreerde bronnen: ${d.sources_registered.join(", ")}\n`+
-    `Normen: ${d.standards.join(", ")}\n`+
-    `Tellingen: ${JSON.stringify(d.counts)}\n`+
-    `Clausules met NC: ${d.clauses_with_nc.join(", ")}\n\n${d.note}`;
+async function loadConfig(){
+  const o = await j("/config/options");
+  const el = document.getElementById("config-form"); el.hidden = false;
+  el.innerHTML =
+    `<strong>Normen:</strong><br>` +
+    o.norms.map(n=>`<label><input type="checkbox" class="cfg-norm" value="${n}" checked> ${n}</label> `).join("") +
+    `<br><br><strong>Bronnen:</strong><br>` +
+    o.sources.map(s=>`<label><input type="checkbox" class="cfg-src" value="${s}"> ${s}</label> `).join("") +
+    `<br><span class="note">Niet-aangevinkte bronnen vallen buiten de run-scope.</span>`;
+}
+function selectedConfig(){
+  return {
+    norms:[...document.querySelectorAll(".cfg-norm:checked")].map(e=>e.value),
+    sources:[...document.querySelectorAll(".cfg-src:checked")].map(e=>e.value)
+  };
 }
 async function run(){
-  const d = await j("/run",{method:"POST"});
-  const el = document.getElementById("run-out");
-  el.hidden = false;
-  el.textContent = `Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}\n\n${d.note}`;
+  const d = await j("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(selectedConfig())});
+  const el = document.getElementById("run-out"); el.hidden = false;
+  el.textContent =
+    `Config — normen: ${d.config.norms.join(", ")||"(geen)"} · bronnen: ${d.config.sources.join(", ")||"(geen)"}\n`+
+    `Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}\n\n${d.note}`;
 }
 async function loadFindings(severity){
   const fs = await j("/findings" + (severity ? "?severity="+severity : ""));
