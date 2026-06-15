@@ -394,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     # memo/profile draaien als Typer-subapp achter dezelfde console-script.
     args_list = list(sys.argv[1:] if argv is None else argv)
-    if args_list and args_list[0] in ("memo", "profile"):
+    if args_list and args_list[0] in ("memo", "draft", "profile"):
         from iso_audit.memo.cli import app as memo_app
 
         memo_app(args_list)  # Typer/click handelt zelf de exit af

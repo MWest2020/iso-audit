@@ -20,7 +20,7 @@
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; color: var(--fg); background: #fff;
-    font-family: {{ profile.brand.font_stack }};
+    font-family: {{ profile.brand.font_stack | safe }};
     font-size: 10.5pt; line-height: 1.5;
   }
   .cover { text-align: center; padding: 4mm 0 8mm 0; border-bottom: 1px solid var(--border); margin-bottom: 8mm; }

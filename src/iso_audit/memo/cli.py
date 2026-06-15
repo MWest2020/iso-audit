@@ -94,6 +94,39 @@ def memo_cmd(
     _console.print(f"[green]memo geschreven:[/green] {html_pad} + {pdf_pad}")
 
 
+@app.command("draft")
+def draft_cmd(
+    findings: Path = typer.Option(..., "--findings", help="Ruwe findings-dataset (JSON)."),
+    norms: Path = typer.Option(..., "--norms", help="Directory met norm-DB <slug>.yaml."),
+    output: Path = typer.Option(..., "--output", help="Pad voor de draft findings-JSON."),
+    top_n: int = typer.Option(3, "--top-n", help="Aantal kop-NC's om te draften."),
+    language: str = typer.Option("nl", "--language", help="Taal voor de draft."),
+) -> None:
+    """Draft (via LLM) de top-NC's uit een ruwe run → bewerkbare findings-JSON.
+
+    De auditor redigeert de output en draait daarna `iso-audit memo`.
+    """
+    from iso_audit.memo.draft import draft_findings
+
+    try:
+        norm_db = laad_norm_db(norms)
+        ruw = _laad_findings(findings)
+        gedraft = draft_findings(ruw, norm_db=norm_db, language=language, top_n=top_n)
+    except (ValueError, OSError) as exc:
+        _fail(str(exc))
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps([f.model_dump() for f in gedraft], ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
+    n_nc = sum(1 for f in gedraft if f.severity == "NC")
+    _console.print(
+        f"[green]draft geschreven:[/green] {output} ({n_nc} kop-NC's). "
+        "Redigeer titel/afwijking/maatregel/acties en draai daarna `iso-audit memo --findings <dit-bestand>`."
+    )
+
+
 @profile_app.command("new")
 def profile_new(
     overschrijf: bool = typer.Option(
