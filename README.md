@@ -69,6 +69,6 @@ OpenSpec-workflow voor substantiële wijzigingen: zie
 
 ## Licentie
 
-Proprietary. Conduction. Open-source-publicatie is een mogelijke route
-beschreven in [`docs/missie.md`](docs/missie.md) §"Risico's bij het tool zelf"
-maar nog niet besloten.
+[EUPL-1.2](LICENSE) (European Union Public Licence) — een copyleft
+open-source-licentie, sterk verankerd in de Europese publieke sector. Zie
+[`LICENSE`](LICENSE) voor de volledige tekst.

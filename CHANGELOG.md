@@ -6,6 +6,16 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-06-15 — licentie Proprietary → EUPL-1.2 (open source)
+
+- **`LICENSE`** toegevoegd: volledige verbatim EUPL-1.2-tekst (canonieke SPDX-
+  bron). **`pyproject.toml`** `license` → `EUPL-1.2` + OSI-classifier.
+  **`README.md`** Licentie-sectie herschreven.
+- Reden: repo wordt publiek gemaakt. EUPL-1.2 (copyleft, EU-publieke-sector)
+  past bij Conduction's open-by-default-cultuur. Tool is gegroeid uit een
+  private repo van de auteur; consultancy-model blijft mogelijk bovenop de
+  open-source-basis.
+
 ### Added — 2026-06-15 — `ONBOARDING.md` als levend onboarding-document
 
 - **`ONBOARDING.md`** toegevoegd: van-nul-naar-productief voor iedereen die

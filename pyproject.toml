@@ -7,10 +7,11 @@ authors = [
     { name = "Mark Westerweel", email = "mwesterweel@hotmail.com" },
 ]
 requires-python = ">=3.12"
-license = { text = "Proprietary" }
+license = { text = "EUPL-1.2" }
 keywords = ["iso", "audit", "iso27001", "iso9001", "compliance"]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)",
     "Intended Audience :: Information Technology",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
