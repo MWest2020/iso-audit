@@ -2,17 +2,24 @@
 
 ## ADDED Requirements
 
-### Requirement: Plug-in norm-database
+### Requirement: Plug-in, user-pointed norm-database
 
-De norm-database MUST plug-in zijn: elk `<standard-slug>.yaml` in `data/norms/`
-(of een door de gebruiker opgegeven pad) wordt geladen. Normen MUST niet
-hardcoded zijn, zodat latere standaarden (14001/22301/42001) zonder code-wijziging
-toegevoegd kunnen worden.
+De norm-database MUST plug-in zijn: de gebruiker MUST een **expliciet pad** naar
+de norm-DB aanwijzen; er is geen magische gebundelde default. Normen MUST niet
+hardcoded zijn (latere standaarden 14001/22301/42001 zonder code-wijziging). De
+**repo blijft lean**: norm-content (volledige/officiële clausuleteksten, EN) is
+user-provided; de repo ship hooguit een minimaal NL-voorbeeld voor de
+reproductie-/integratietest.
 
-#### Scenario: Extra norm-bestand
+#### Scenario: Gebruiker wijst norm-DB aan
 
-- **WHEN** een nieuw `data/norms/<slug>.yaml` wordt toegevoegd
-- **THEN** is die standaard beschikbaar voor profielen en memo-generatie zonder codewijziging
+- **WHEN** de gebruiker een norm-DB-pad opgeeft met `<slug>.yaml`-bestanden
+- **THEN** zijn die standaarden beschikbaar voor memo-generatie zonder codewijziging
+
+#### Scenario: Geen pad opgegeven
+
+- **WHEN** geen norm-DB-pad is opgegeven en geen default is geconfigureerd
+- **THEN** faalt de generatie met een duidelijke fout die vraagt de norm-DB aan te wijzen (geen stille fallback)
 
 ### Requirement: Meertalige clausule-lookup
 
@@ -35,13 +42,14 @@ of verzinnen.
 - **WHEN** een NC verwijst naar clausule `9.9` die niet in de norm-database bestaat
 - **THEN** faalt de generatie met een fout die de ontbrekende clausule en standaard noemt
 
-### Requirement: MVP-clausuledekking
+### Requirement: Voorbeeld-norm-DB dekt de referentie-clausules
 
-De MVP-norm-databases voor ISO 9001:2015 en ISO 27001:2022 MUST minimaal de
-clausules uit het referentievoorbeeld bevatten: 4.4, 5.11, 5.18, 5.24, 5.27,
-6.3, 6.5, 8.13, 8.15, 8.16, 10.1 en 10.2.
+Het meegeleverde voorbeeld-norm-DB (NL) MUST de referentie-clausules van ISO
+9001:2015 en ISO 27001:2022 bevatten (4.4, 5.11, 5.18, 5.24, 5.27, 6.3, 6.5,
+8.13, 8.15, 8.16, 10.1, 10.2), gesourcet uit de bestaande repo-normteksten zodat
+er geen tekst verzonnen wordt. EN en volledige dekking zijn user-provided.
 
 #### Scenario: Referentie-memo resolvet alle clausules
 
-- **WHEN** de referentie-memo wordt gegenereerd
-- **THEN** resolvet elke geciteerde clausule in de meegeleverde norm-databases zonder hard-fail
+- **WHEN** de referentie-memo (NL) wordt gegenereerd tegen het voorbeeld-norm-DB
+- **THEN** resolvet elke geciteerde clausule zonder hard-fail
