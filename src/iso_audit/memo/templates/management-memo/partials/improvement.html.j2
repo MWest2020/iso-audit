@@ -1,0 +1,18 @@
+{#- Eén verbeterpunt (variabele `imp`) -#}
+<h2>Verbeterpunt — {{ imp.title }}</h2>
+
+<h4>Norm</h4>
+{% for c in imp.citations %}
+<p class="norm-ref">{{ c.standard }} {{ c.clause }} — {{ c.title }}</p>
+<div class="norm-quote">"{{ c.text }}"</div>
+{% endfor %}
+
+<h4>Waar de praktijk afwijkt</h4>
+<div>{{ imp.deviation | safe }}</div>
+
+<h4>Waarom verbeterpunt en geen NC?</h4>
+<div>{{ imp.classification_rationale | safe }}</div>
+
+{% if imp.suggestion %}
+<div class="recommendation"><strong>Suggestie:</strong> {{ imp.suggestion | safe }}</div>
+{% endif %}

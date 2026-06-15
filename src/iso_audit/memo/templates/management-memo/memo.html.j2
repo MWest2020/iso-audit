@@ -1,0 +1,80 @@
+{#- Management-auditmemo. Styling per profiel via {{ colors }} + font_stack.
+    Rich tekstvelden (lead_summary, deviation, corrective_measure, rationale,
+    suggestion, logo_svg, title) worden als veilige HTML gerenderd — input is
+    auditor-gecontroleerd. Norm-citaten en context-velden worden ge-escaped. -#}
+<!DOCTYPE html>
+<html lang="{{ memo.context.scope and 'nl' or 'nl' }}">
+<head>
+<meta charset="UTF-8">
+<title>{{ memo.title | striptags }}</title>
+<style>
+  @page { size: A4 portrait; margin: 18mm 20mm; }
+  :root {
+    --primary: {{ colors.primary }};
+    --accent: {{ colors.accent }};
+    --fg: #1a1a1a;
+    --muted: {{ colors.muted }};
+    --border: {{ colors.border }};
+    --soft-bg: {{ colors.soft_bg }};
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; color: var(--fg); background: #fff;
+    font-family: {{ profile.brand.font_stack }};
+    font-size: 10.5pt; line-height: 1.5;
+  }
+  .cover { text-align: center; padding: 4mm 0 8mm 0; border-bottom: 1px solid var(--border); margin-bottom: 8mm; }
+  .cover h1 { color: var(--primary); font-size: 26pt; font-weight: 700; line-height: 1.15; margin: 0 0 6mm 0; letter-spacing: -0.2pt; }
+  .cover .subtitle { color: var(--muted); font-size: 11pt; margin-bottom: 5mm; }
+  .cover .date { color: var(--muted); font-size: 10pt; margin-bottom: 6mm; }
+  .cover .logo svg { width: 38px; height: auto; }
+  h2 { color: var(--primary); font-size: 14pt; font-weight: 700; margin: 7mm 0 2mm 0; }
+  h3 { font-size: 11pt; font-weight: 600; margin: 4mm 0 1mm 0; color: var(--fg); }
+  h4 { color: var(--primary); font-size: 10.5pt; font-weight: 600; margin: 3mm 0 1mm 0; }
+  p { margin: 0 0 2.5mm 0; }
+  ul { margin: 0 0 3mm 0; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  table { border-collapse: collapse; width: 100%; margin: 2mm 0 4mm 0; font-size: 9.5pt; }
+  th, td { border: 1px solid var(--border); padding: 2mm 3mm; text-align: left; vertical-align: top; }
+  th { background: var(--soft-bg); font-weight: 600; color: var(--primary); }
+  .norm-ref { color: var(--muted); font-style: italic; font-size: 9pt; margin: 1mm 0 5mm 0; }
+  .norm-quote { background: var(--soft-bg); border-left: 3px solid var(--primary); padding: 2mm 4mm; margin: 1mm 0 3mm 0; font-style: italic; font-size: 9.5pt; }
+  .lead { background: var(--soft-bg); border-left: 3px solid var(--primary); padding: 3mm 4mm; margin: 3mm 0 5mm 0; font-size: 10pt; }
+  .recommendation { margin: 3mm 0 2mm 0; padding: 2mm 3mm; background: var(--soft-bg); border-left: 3px solid var(--primary); font-size: 10pt; }
+  .recommendation strong { color: var(--primary); }
+  .placeholder { color: var(--muted); font-style: italic; }
+  .pattern { font-size: 9.5pt; margin: 2mm 0 3mm 0; }
+  a { color: var(--primary); text-decoration: none; }
+  .footer { margin-top: 10mm; padding-top: 3mm; border-top: 1px solid var(--border); color: var(--muted); font-size: 8.5pt; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>{{ memo.title | safe }}</h1>
+  <div class="subtitle">{{ memo.subtitle }}</div>
+  <div class="date">{{ memo.date }} · {{ memo.version }}</div>
+  <div class="logo">{{ profile.brand.logo_svg | safe }}</div>
+</div>
+
+<div class="lead">{{ memo.lead_summary | safe }}</div>
+
+{% include "management-memo/partials/context.html.j2" %}
+
+{% for nc in memo.nc_blocks %}
+{% include "management-memo/partials/nc.html.j2" %}
+{% endfor %}
+
+{% for imp in memo.improvements %}
+{% include "management-memo/partials/improvement.html.j2" %}
+{% endfor %}
+
+{% include "management-memo/partials/historical.html.j2" %}
+
+<div class="footer">
+  Auditmemo · {{ memo.subtitle }} · {{ memo.date }} · {{ memo.version }} ·
+  Detail-rapportage in <em>{{ memo.detail_report_ref }}</em>
+</div>
+
+</body>
+</html>

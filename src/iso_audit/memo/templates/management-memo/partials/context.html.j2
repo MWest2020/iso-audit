@@ -1,0 +1,38 @@
+{#- Context-sectie: data-gedreven uit memo.context -#}
+<h2>Context</h2>
+
+<h3>Auditcyclus</h3>
+<p>{{ memo.context.audit_cycle }}</p>
+
+<h3>Scope (geauditeerde hoofdstukken)</h3>
+<ul>
+{% for norm, hoofdstukken in memo.context.scope.items() %}
+  <li>{{ norm }} — {{ hoofdstukken }}</li>
+{% endfor %}
+</ul>
+
+<h3>Geraadpleegde bronnen</h3>
+<ul>
+{% for bron in memo.context.sources %}
+  <li>{{ bron }}</li>
+{% endfor %}
+{% if memo.context.dataset_counts %}
+  <li>Bevindingen-dataset —
+    {%- for sev, n in memo.context.dataset_counts.items() %} {{ n }} {{ sev }}{{ "," if not loop.last }}{% endfor %}.
+  </li>
+{% endif %}
+</ul>
+
+<h3>Voorbehoud auditscope en oplossing</h3>
+<p>{{ memo.context.scope_caveat }}</p>
+
+{% if memo.context.independence_caveat %}
+<h3>Voorbehoud auditor-onafhankelijkheid</h3>
+<p>{{ memo.context.independence_caveat }}</p>
+{% endif %}
+
+<h3>Bespreking</h3>
+<p>
+{%- if memo.context.discussion %}{{ memo.context.discussion }}
+{%- else %}<span class="placeholder">bespreking nog niet gepland</span>{% endif %}
+</p>

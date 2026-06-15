@@ -39,13 +39,13 @@
 
 ## 5. Rendering (capability: auditmemo)
 
-- [ ] 5.1 `templates/management-memo/`: `memo.html.j2` + partials (cover, context, nc, improvement, historical) — print-CSS A4, palette-variabelen, inline SVG, `.placeholder`-styling (uit referentie-HTML)
-- [ ] 5.2 `renderer/html.py`: Jinja2-wrapper; injecteer profiel-palette + font-stack + logo
-- [ ] 5.3 `renderer/pdf.py`: WeasyPrint-wrapper; self-contained (geen externe assets)
-- [ ] 5.4 Action-table per NC (wat/wie/waar/uiterlijk) met gemarkeerde placeholders
-- [ ] 5.5 Voorbehoud-secties (auditscope + conditioneel onafhankelijkheid)
-- [ ] 5.6 Historical-NC-statustabel uit `historical_ncs.yaml`
-- [ ] 5.7 Audit-trail-metadata: HTML-comment + PDF-metadata (profile-slug/-versie, tool-versie, render-timestamp, findings-hash)
+- [x] 5.1 `templates/management-memo/`: `memo.html.j2` + partials (context, nc, improvement, historical) — print-CSS A4, palette-variabelen, inline SVG, `.placeholder`-styling (uit referentie-HTML)
+- [x] 5.2 `renderer/html.py`: Jinja2-wrapper (autoescape, |safe op rich velden); injecteert profiel-palette + font-stack + logo
+- [x] 5.3 `renderer/pdf.py`: WeasyPrint-wrapper; self-contained
+- [x] 5.4 Action-table per NC (wat/wie/waar/uiterlijk) met gemarkeerde placeholders
+- [x] 5.5 Voorbehoud-secties (auditscope + conditioneel onafhankelijkheid)
+- [x] 5.6 Historical-NC-statustabel uit `historical_ncs.yaml`
+- [ ] 5.7 Audit-trail-metadata: HTML-comment + PDF-metadata (profile-slug/-versie, tool-versie, render-timestamp, findings-hash) — bij de builder (fase 6)
 
 ## 6. CLI memo-command (capability: auditmemo)
 

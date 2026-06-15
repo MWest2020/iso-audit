@@ -1,0 +1,32 @@
+{#- Eén NC-blok (variabele `nc`) -#}
+<h2>{{ nc.title }}</h2>
+
+<h4>Norm</h4>
+{% for c in nc.citations %}
+<p class="norm-ref">{{ c.standard }} {{ c.clause }} — {{ c.title }}</p>
+<div class="norm-quote">"{{ c.text }}"</div>
+{% endfor %}
+
+<h4>Waar de praktijk afwijkt</h4>
+<div>{{ nc.deviation | safe }}</div>
+{% if nc.pattern_note %}<p class="pattern">{{ nc.pattern_note }}</p>{% endif %}
+
+<div class="recommendation">
+  <strong>Vereiste corrigerende maatregel:</strong> {{ nc.corrective_measure | safe }}
+</div>
+
+{% if nc.actions %}
+<table>
+<thead><tr><th>Wat</th><th>Wie</th><th>Waar</th><th>Uiterlijk</th></tr></thead>
+<tbody>
+{% for row in nc.actions %}
+<tr>
+  <td>{{ row.wat }}</td>
+  <td>{% if row.wie %}{{ row.wie }}{% else %}<span class="placeholder">eigenaar in te vullen</span>{% endif %}</td>
+  <td>{% if row.waar %}{{ row.waar }}{% else %}<span class="placeholder">locatie in te vullen</span>{% endif %}</td>
+  <td>{% if row.uiterlijk %}{{ row.uiterlijk }}{% else %}<span class="placeholder">datum in te vullen</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}

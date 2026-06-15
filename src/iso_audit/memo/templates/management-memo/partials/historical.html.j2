@@ -1,0 +1,19 @@
+{#- Status eerder geconstateerde NC's (memo.historical_ncs) -#}
+{% if memo.historical_ncs %}
+<h2>Status eerder geconstateerde NC's (ter afronding in MT)</h2>
+<table>
+<thead><tr><th>Bevinding / oorsprong</th><th>Bron-document</th><th>Status</th></tr></thead>
+<tbody>
+{% for e in memo.historical_ncs %}
+<tr>
+  <td>{{ e.source_audit }} — {{ e.finding_summary }}</td>
+  <td>{{ e.source_document }}</td>
+  <td>
+    {{ e.status }}{% if e.closed_date %} ({{ e.closed_date }}){% endif %}
+    {%- if e.closed_evidence %} — {{ e.closed_evidence }}{% endif %}
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
