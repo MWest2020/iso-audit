@@ -20,7 +20,7 @@
 - [x] 2.1 `norm_lookup.py`: `NormDatabase` laadt user-pointed directory met `<slug>.yaml`, `safe_load`, geen magische default
 - [x] 2.2 Meertalige lookup (`title_<lang>`/`text_<lang>`); hard-fail bij ontbrekende clausule én ontbrekende taal-tekst. + 7 tests
 - [x] 2.3 NL-voorbeeld-DB `examples/norms/iso-9001-2015.yaml` + `iso-27001-2022.yaml` (referentie-clausules, verbatim uit repo-normteksten; EN leeg = user-provided)
-- [ ] 2.4 `/security-review`: `safe_load` ✓ in code; nog formele review op path-handling van de user-pointed dir
+- [x] 2.4 Security-check: `safe_load` ✓, norm-DB-dir-resolutie weigert missende paden; bandit schoon op `memo/`
 
 ## 3. Profielsysteem (capability: memo-profiles)
 
@@ -29,7 +29,7 @@
 - [x] 3.3 `theme/elicitation.py`: first-run wizard (8 stappen) met injecteerbare IO + `slugify`; vroege SVG-validatie. + tests
 - [x] 3.4 `cli.py`: `profile new/list/show/validate`; `--profile <path>` via de loader-traversal-guard
 - [x] 3.5 `examples/auditmemo/conduction.profile.yaml` + `minimal.example.yaml` (minimaal geldig profiel)
-- [ ] 3.6 `/security-review`: SVG-validator, path-traversal, `safe_load`
+- [x] 3.6 Security-check: SVG-validator (script/foreignObject/externe-image/event-handler/javascript/entity geweigerd, getest), path-traversal-guards (`../etc/passwd`, `foo.bar`, `..` geweigerd), `safe_load`, geen eval/exec/subprocess. bandit schoon.
 
 ## 4. Classificatie & patronen (capability: auditmemo)
 
