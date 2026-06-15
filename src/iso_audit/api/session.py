@@ -68,23 +68,34 @@ class AuditSession:
         *,
         severity: Severity | None = None,
         triage_status: TriageStatus | None = None,
+        title: str | None = None,
+        deviation: str | None = None,
+        corrective_measure: str | None = None,
         reason: str,
         actor: str = "auditor",
         now: datetime | None = None,
     ) -> Finding:
-        """Reclassificeer/triage één finding; legt de override append-only vast."""
+        """Reclassificeer/triage/redigeer één finding; legt elke wijziging append-only vast."""
         findings = self.findings()
         doel = next((f for f in findings if f.id == finding_id), None)
         if doel is None:
             raise SessionError(f"Finding {finding_id!r} niet gevonden.")
         stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
         wijzigingen: list[tuple[str, str, str]] = []
-        if severity is not None and severity != doel.severity:
-            wijzigingen.append(("severity", doel.severity, severity))
-            doel.severity = severity
-        if triage_status is not None and triage_status != doel.triage_status:
-            wijzigingen.append(("triage_status", doel.triage_status, triage_status))
-            doel.triage_status = triage_status
+
+        def _maybe(veld: str, nieuw: str | None) -> None:
+            if nieuw is None:
+                return
+            oud = getattr(doel, veld) or ""
+            if nieuw != oud:
+                wijzigingen.append((veld, str(oud)[:120], str(nieuw)[:120]))
+                setattr(doel, veld, nieuw)
+
+        _maybe("severity", severity)
+        _maybe("triage_status", triage_status)
+        _maybe("title", title)
+        _maybe("deviation", deviation)
+        _maybe("corrective_measure", corrective_measure)
         if not wijzigingen:
             return doel
         self._save(findings)

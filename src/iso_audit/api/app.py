@@ -14,14 +14,17 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from iso_audit.api.session import AuditSession, SessionError
-from iso_audit.memo.models import Severity, TriageStatus
+from iso_audit.memo.models import Finding, Severity, TriageStatus
 
 
 class TriageUpdate(BaseModel):
-    """Reclassificatie (NC↔OFI) en/of triage-status, met verplichte reden."""
+    """Reclassificatie/triage en/of redactie van de kop-NC-tekst, met reden."""
 
     severity: Severity | None = None
     triage_status: TriageStatus | None = None
+    title: str | None = None
+    deviation: str | None = None
+    corrective_measure: str | None = None
     reason: str = ""
 
 
@@ -58,6 +61,9 @@ def create_app(session: AuditSession) -> FastAPI:
                 finding_id,
                 severity=update.severity,
                 triage_status=update.triage_status,
+                title=update.title,
+                deviation=update.deviation,
+                corrective_measure=update.corrective_measure,
                 reason=update.reason,
             )
         except SessionError as exc:
@@ -69,6 +75,14 @@ def create_app(session: AuditSession) -> FastAPI:
             title=f.title,
             triage_status=f.triage_status,
         )
+
+    @app.get("/findings/{finding_id}", response_model=Finding)
+    def finding_detail(finding_id: str) -> Finding:
+        """Volledige finding (incl. afwijking/maatregel) voor de editor."""
+        f = next((x for x in session.findings() if x.id == finding_id), None)
+        if f is None:
+            raise HTTPException(status_code=404, detail=f"Finding {finding_id!r} niet gevonden.")
+        return f
 
     @app.get("/trail")
     def trail() -> list[dict[str, str]]:

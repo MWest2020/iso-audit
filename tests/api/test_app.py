@@ -85,6 +85,28 @@ def test_triage_status_endpoint(tmp_path: Path) -> None:
     assert d == {"total_nc": 1, "open": 0, "complete": True}
 
 
+def test_finding_detail(tmp_path: Path) -> None:
+    r = _client(tmp_path).get("/findings/f1")
+    assert r.status_code == 200
+    assert r.json()["clause"] == "6.5"
+
+
+def test_tekst_redactie_append_only(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    r = client.post(
+        "/findings/f1",
+        json={
+            "deviation": "Herschreven afwijking.",
+            "corrective_measure": "Doe Z.",
+            "reason": "redactie",
+        },
+    )
+    assert r.status_code == 200
+    assert client.get("/findings/f1").json()["deviation"] == "Herschreven afwijking."
+    velden = {e["field"] for e in client.get("/trail").json()}
+    assert {"deviation", "corrective_measure"} <= velden
+
+
 def test_onbekende_finding_404(tmp_path: Path) -> None:
     r = _client(tmp_path).post("/findings/zzz", json={"severity": "OFI", "reason": "x"})
     assert r.status_code == 404
