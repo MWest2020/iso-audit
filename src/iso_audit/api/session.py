@@ -156,7 +156,7 @@ class AuditSession:
         norm: str = "9001",
         sources: list[str] | None = None,
         chapter: str | None = None,
-        top_n: int = 3,
+        top_n: int = 0,
         pace_s: float = 0.05,
     ) -> dict[str, object]:
         """Stap 2: start de run. ``mode='live'`` = echte pipeline (Drive+LLM);
@@ -240,6 +240,25 @@ class AuditSession:
                 "Findings uit de sessie (resultaat van een eerdere run). Live ingest "
                 "via de gekozen bron(nen) is de connector-orchestration-fase."
             ),
+        }
+
+    def finding_context(self, finding_id: str) -> dict[str, object]:
+        """Hover-context: de échte normtekst per clausule + waarom NC-kandidaat."""
+        doel = next((f for f in self.findings() if f.id == finding_id), None)
+        if doel is None:
+            raise SessionError(f"Finding {finding_id!r} niet gevonden.")
+        db = laad_norm_db(self._norms_dir)
+        lang = self._profile().defaults.language
+        citations: list[dict[str, str]] = []
+        for clause in [doel.clause, *doel.extra_clauses]:
+            try:
+                citations.append(db.citation(doel.standard, clause, lang).model_dump())
+            except Exception:  # ontbrekende clausule mag de hover niet breken
+                continue
+        return {
+            "citations": citations,
+            "reasoning": doel.reasoning,
+            "deviation": doel.deviation or doel.description,
         }
 
     def triage_summary(self) -> dict[str, object]:

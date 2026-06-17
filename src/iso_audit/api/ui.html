@@ -83,7 +83,7 @@ async function loadConfig(){
     `<strong>Normen:</strong><br>` +
     o.norms.map(n=>`<label><input type="checkbox" class="cfg-norm" value="${n}" checked> ${n}</label> `).join("") +
     `<br><br><strong>Bronnen:</strong><br>` +
-    o.sources.map(s=>`<label><input type="checkbox" class="cfg-src" value="${s}"> ${s}</label> `).join("") +
+    o.sources.map(s=>`<label><input type="checkbox" class="cfg-src" value="${s}" checked> ${s}</label> `).join("") +
     `<br><span class="note">Niet-aangevinkte bronnen vallen buiten de run-scope.</span>`;
 }
 function selectedConfig(){
@@ -98,6 +98,11 @@ function normCode(norms){
 }
 async function startRun(){
   const cfg = selectedConfig();
+  // Vorige ronde wissen — voorkomt dat stale triage/memo blijft staan (bv. als de run faalt).
+  document.getElementById("triage-wrap").innerHTML = "";
+  document.getElementById("editor").innerHTML = "";
+  document.getElementById("memo-frame").innerHTML = "";
+  document.getElementById("run-out").hidden = true;
   const live = document.getElementById("live-mode").checked;
   const chapter = document.getElementById("chapter").value.trim() || null;
   await fetch("/run/start",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -127,7 +132,7 @@ async function loadFindings(severity){
   const fs = await j("/findings" + (severity ? "?severity="+severity : ""));
   let rows = fs.map(f => `
     <tr data-id="${f.id}">
-      <td>${f.title}</td><td>${f.clause}</td>
+      <td class="f-title" style="cursor:help">${f.title}</td><td class="f-clause" style="cursor:help">${f.clause}</td>
       <td>${SEV.map(s=>`<button class="sev" aria-pressed="${f.severity===s}" onclick="setSev('${f.id}','${s}',this)">${s}</button>`).join(" ")}</td>
       <td><select onchange="setTriage('${f.id}',this.value)">
         ${TRIAGE.map(t=>`<option value="${t}" ${f.triage_status===t?"selected":""}>${t}</option>`).join("")}
@@ -137,6 +142,19 @@ async function loadFindings(severity){
     </tr>`).join("");
   document.getElementById("triage-wrap").innerHTML =
     `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  for(const f of fs){ enrichTooltip(f.id); }
+}
+async function enrichTooltip(id){
+  try{
+    const c = await j("/findings/"+id+"/context");
+    const tr = document.querySelector(`tr[data-id="${id}"]`);
+    if(!tr) return;
+    const norm = c.citations.map(x=>`${x.standard} §${x.clause} — ${x.title}\n"${x.text}"`).join("\n\n");
+    if(norm) tr.querySelector("td.f-clause").title = norm;  // hover clausule = échte normtekst
+    const why = (c.reasoning && c.reasoning.length ? "Waarom NC-kandidaat (wat de tool aantrof):\n- "+c.reasoning.join("\n- ") : "")
+      + (c.deviation ? "\n\nAfwijking:\n"+c.deviation.replace(/<[^>]+>/g,"") : "");
+    if(why.trim()) tr.querySelector("td.f-title").title = why.trim();  // hover bevinding = waarom
+  }catch(e){ /* hover-context is best-effort */ }
 }
 function reasonFor(id){
   const tr = document.querySelector(`tr[data-id="${id}"]`);

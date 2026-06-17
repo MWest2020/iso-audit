@@ -91,6 +91,14 @@ def test_finding_detail(tmp_path: Path) -> None:
     assert r.json()["clause"] == "6.5"
 
 
+def test_finding_context_hover(tmp_path: Path) -> None:
+    c = _client(tmp_path).get("/findings/f1/context").json()
+    assert c["citations"]  # 6.5 resolvet in de voorbeeld-norm-DB
+    assert c["citations"][0]["clause"] == "6.5"
+    assert c["citations"][0]["text"]  # échte normtekst voor de hover
+    assert "deviation" in c and "reasoning" in c
+
+
 def test_tekst_redactie_append_only(tmp_path: Path) -> None:
     client = _client(tmp_path)
     r = client.post(

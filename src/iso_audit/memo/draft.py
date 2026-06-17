@@ -50,7 +50,7 @@ def cluster_ncs(findings: list[Finding], top_n: int) -> list[list[Finding]]:
         if f.severity == "NC":
             per_clausule[f.clause].append(f)
     geordend = sorted(per_clausule.values(), key=lambda c: (-len(c), c[0].clause))
-    return geordend[:top_n]
+    return geordend if top_n <= 0 else geordend[:top_n]  # top_n<=0 = alle kandidaten
 
 
 def _clausule_titel(norm_db: NormDatabase, standard: str, clause: str, language: str) -> str:

@@ -42,7 +42,7 @@ class RunStartRequest(BaseModel):
     norm: str = "9001"  # run-code: 9001 | 27001 | beide
     sources: list[str] = []
     chapter: str | None = None  # hoofdstuk-filter (scoping), bv. "8"
-    top_n: int = 3
+    top_n: int = 0  # 0 = alle NC-kandidaten draften (geen cap)
     pace: float = 0.05
 
 
@@ -101,6 +101,14 @@ def create_app(session: AuditSession) -> FastAPI:
         if f is None:
             raise HTTPException(status_code=404, detail=f"Finding {finding_id!r} niet gevonden.")
         return f
+
+    @app.get("/findings/{finding_id}/context")
+    def finding_context(finding_id: str) -> dict[str, object]:
+        """Hover-context: normtekst per clausule + redenatie (waarom NC-kandidaat)."""
+        try:
+            return session.finding_context(finding_id)
+        except SessionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.get("/trail")
     def trail() -> list[dict[str, str]]:

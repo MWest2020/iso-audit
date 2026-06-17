@@ -99,7 +99,7 @@ def draft_cmd(
     findings: Path = typer.Option(..., "--findings", help="Ruwe findings-dataset (JSON)."),
     norms: Path = typer.Option(..., "--norms", help="Directory met norm-DB <slug>.yaml."),
     output: Path = typer.Option(..., "--output", help="Pad voor de draft findings-JSON."),
-    top_n: int = typer.Option(3, "--top-n", help="Aantal kop-NC's om te draften."),
+    top_n: int = typer.Option(0, "--top-n", help="Aantal kop-NC's (0 = alle kandidaten)."),
     language: str = typer.Option("nl", "--language", help="Taal voor de draft."),
 ) -> None:
     """Draft (via LLM) de top-NC's uit een ruwe run → bewerkbare findings-JSON.
