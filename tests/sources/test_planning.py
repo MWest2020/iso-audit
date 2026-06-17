@@ -358,3 +358,27 @@ def test_gws_lees_alle_tabs_skipt_falende_tab() -> None:
         out = gws.gws_lees_alle_tabs("sid")
     assert "Tab1" in out
     assert "Tab2" not in out
+
+
+# ---------- sheet-id validatie (config-grens) ----------
+
+
+def test_valideer_sheet_id_clean_geen_warning(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        out = planning._valideer_sheet_id(planning.DEFAULT_PLANNING_SHEETS_ID)
+    assert out == planning.DEFAULT_PLANNING_SHEETS_ID
+    assert "misvormd" not in caplog.text
+
+
+def test_valideer_sheet_id_waarschuwt_bij_misvorming(caplog: pytest.LogCaptureFixture) -> None:
+    """Een .env-regel zonder newline plakt de volgende toewijzing aan de ID."""
+    import logging
+
+    kapot = "1BV2abcGOOGLE_SERVICE_ACCOUNT_FILE=audit/config/service_account.json"
+    with caplog.at_level(logging.WARNING):
+        out = planning._valideer_sheet_id(kapot)
+    # Waarde wordt NIET aangepast (geen stille verkeerde-sheet-bug), wel gewaarschuwd.
+    assert out == kapot
+    assert "misvormd" in caplog.text

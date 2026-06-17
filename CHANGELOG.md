@@ -6,6 +6,25 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-06-17 — Jira: JIRA_USER_EMAIL + project-scoping; planning sheet-id-validatie
+
+- **`JiraSource`** (`sources/jira.py`): leest nu `JIRA_USER_EMAIL` (gekozen naam),
+  met `JIRA_EMAIL` als fallback (geen breaking change). Healthcheck-reden +
+  module-docstring bijgewerkt.
+- **Jira project-scoping**: nieuwe env `JIRA_PROJECTS` (komma-gescheiden, bv.
+  `"ISO"`). Wordt als `project in ("ISO", …)` AND-prefix op elke effectieve JQL
+  gezet (documenten én findings), zodat een run binnen de ISO-scope blijft.
+  Volledige JQL-override blijft via `JIRA_JQL` / `JIRA_FINDINGS_JQL` /
+  `filter={"jql": …}`.
+- **`PlanningSource`**: valideert de Sheets-ID aan de config-grens
+  (`_valideer_sheet_id`). Een `=` of whitespace (typisch een .env-regel zonder
+  newline die de volgende toewijzing aan de waarde plakt) geeft nu een
+  duidelijke waarschuwing i.p.v. een cryptische gws-fout. De waarde wordt niet
+  aangepast (geen stille verkeerde-sheet-bug).
+- **Tests**: hermetische autouse-fixture die alle `JIRA_*`-env stript (voorkomt
+  dat een gebruiker-.env de geasserteerde JQL beïnvloedt) + 5 nieuwe Jira-tests
+  + 2 planning-validatie-tests.
+
 ### Added — 2026-06-17 — bron-healthcheck + UI grey-out van niet-gekoppelde bronnen
 
 Connectoren-fase, stap 1: voorkomen dat de auditor een bron selecteert die niet

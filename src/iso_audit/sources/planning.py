@@ -35,6 +35,28 @@ logger = logging.getLogger(__name__)
 DEFAULT_PLANNING_SHEETS_ID = "1BV2yajU7tQWU4dJPGc79V-mnH_-bQWCHKzhcU7XY37A"
 PLANNING_SHEETS_ID_ENV = "AUDIT_PLANNING_SHEETS_ID"
 
+
+def _valideer_sheet_id(sid: str) -> str:
+    """Waarschuw als een Sheets-ID misvormd lijkt (validatie aan de config-grens).
+
+    Een Google Sheets-ID bestaat uit ``[A-Za-z0-9_-]``. Een ``=`` of whitespace
+    duidt bijna altijd op een .env-fout — bv. een regel zonder newline die de
+    volgende toewijzing aan de waarde plakt (``...37AGOOGLE_SERVICE_ACCOUNT_FILE=
+    ...``). We loggen dan een duidelijke waarschuwing i.p.v. verderop een
+    cryptische gws-fout te krijgen. De waarde wordt NIET aangepast: stilletjes
+    een andere sheet aanspreken is erger dan zichtbaar falen.
+    """
+    if "=" in sid or any(c.isspace() for c in sid):
+        logger.warning(
+            "%s lijkt misvormd: bevat '=' of whitespace (%d tekens). Waarschijnlijk "
+            "een .env-regel zonder newline. Verwacht alleen [A-Za-z0-9_-]. "
+            "Controleer je .env.",
+            PLANNING_SHEETS_ID_ENV,
+            len(sid),
+        )
+    return sid
+
+
 MAANDEN: tuple[str, ...] = (
     "januari",
     "februari",
@@ -180,7 +202,7 @@ class PlanningSource:
     naam = "planning"
 
     def __init__(self, spreadsheet_id: str | None = None) -> None:
-        self._spreadsheet_id = (
+        self._spreadsheet_id = _valideer_sheet_id(
             spreadsheet_id or os.environ.get(PLANNING_SHEETS_ID_ENV) or DEFAULT_PLANNING_SHEETS_ID
         )
 

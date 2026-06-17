@@ -10,6 +10,25 @@ import pytest
 from iso_audit.sources.base import Document, Source
 
 
+@pytest.fixture(autouse=True)
+def _schone_jira_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hermetisch: geen JIRA_*-env uit .env mag de tests beïnvloeden.
+
+    Met name JIRA_PROJECTS/JIRA_JQL zouden anders de geasserteerde JQL wijzigen
+    zodra ze in de gebruiker-.env staan.
+    """
+    for var in (
+        "JIRA_BASE_URL",
+        "JIRA_USER_EMAIL",
+        "JIRA_EMAIL",
+        "JIRA_API_TOKEN",
+        "JIRA_JQL",
+        "JIRA_FINDINGS_JQL",
+        "JIRA_PROJECTS",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
 def _fake_response(ok: bool = True, status: int = 200, data: dict[str, Any] | None = None) -> Any:
     m = MagicMock()
     m.ok = ok
@@ -268,3 +287,64 @@ def test_http_get_error_raised_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
         pytest.raises(OSError, match="500"),
     ):
         list(src.list_documents())
+
+
+# ---------- JIRA_USER_EMAIL + JIRA_PROJECTS scoping ----------
+
+
+def test_email_uit_jira_user_email(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    monkeypatch.setenv("JIRA_USER_EMAIL", "user@conduction.nl")
+    monkeypatch.setenv("JIRA_EMAIL", "old@conduction.nl")  # mag JIRA_USER_EMAIL niet overrulen
+    assert JiraSource()._email == "user@conduction.nl"
+
+
+def test_email_fallback_naar_jira_email(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    monkeypatch.setenv("JIRA_EMAIL", "old@conduction.nl")  # JIRA_USER_EMAIL afwezig
+    assert JiraSource()._email == "old@conduction.nl"
+
+
+def test_jira_projects_scopt_jql(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    monkeypatch.setenv("JIRA_PROJECTS", "ISO, COMP")
+    src = JiraSource(
+        base_url="https://x", email="e@b", api_token="t", default_jql="labels=iso27001"
+    )
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data={"issues": [], "total": 0}),
+    ) as mock_get:
+        list(src.list_documents())
+    used = mock_get.call_args.kwargs["params"]["jql"]
+    assert used == '(project in ("ISO", "COMP")) AND (labels=iso27001)'
+
+
+def test_jira_projects_scope_zonder_base_jql(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    monkeypatch.setenv("JIRA_PROJECTS", "ISO")
+    src = JiraSource(base_url="https://x", email="e@b", api_token="t")  # geen default_jql
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data={"issues": [], "total": 0}),
+    ) as mock_get:
+        list(src.list_documents())
+    assert mock_get.call_args.kwargs["params"]["jql"] == 'project in ("ISO")'
+
+
+def test_geen_jira_projects_laat_jql_ongemoeid() -> None:
+    from iso_audit.sources.jira import JiraSource
+
+    src = JiraSource(
+        base_url="https://x", email="e@b", api_token="t", default_jql="labels=iso27001"
+    )
+    with patch(
+        "iso_audit.sources.jira.requests.get",
+        return_value=_fake_response(data={"issues": [], "total": 0}),
+    ) as mock_get:
+        list(src.list_documents())
+    assert mock_get.call_args.kwargs["params"]["jql"] == "labels=iso27001"

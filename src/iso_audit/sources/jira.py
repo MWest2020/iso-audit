@@ -4,10 +4,12 @@ Read-only: enumereert Jira issues als `Document`s en kan ze ook als
 `Finding`s exposeren (voor backlog-items die direct compliance-bewijs
 zijn — bv. een ISO-aanbevelings-ticket).
 
-Auth: API-token via env-vars (`JIRA_BASE_URL`, `JIRA_EMAIL`,
-`JIRA_API_TOKEN`) met HTTP basic auth (Atlassian's standaard voor
-Cloud-token-auth). JQL-config via `JIRA_JQL` (default: alle issues
-in een project, leeg betekent geen filter).
+Auth: persoonlijke Atlassian API-token via env-vars (`JIRA_BASE_URL`,
+`JIRA_USER_EMAIL` — `JIRA_EMAIL` als fallback —, `JIRA_API_TOKEN`) met HTTP
+basic auth (Atlassian's standaard voor Cloud-token-auth). JQL-config via
+`JIRA_JQL` (leeg = geen filter). Scope op project(en) via `JIRA_PROJECTS`
+(komma-gescheiden, bv. "ISO"): wordt als `project in (…)` AND-prefix op elke
+query gezet zodat een run binnen de ISO-scope blijft.
 
 Pagination: Jira Cloud's `/search` endpoint geeft maximaal `maxResults=100`
 per call; deze adapter paginate via `startAt` tot uitputting.
@@ -48,11 +50,32 @@ class JiraSource:
     ) -> None:
         """Construct met expliciete creds of fallback naar env-vars."""
         self._base_url = (base_url or os.environ.get("JIRA_BASE_URL", "")).rstrip("/")
-        self._email = email or os.environ.get("JIRA_EMAIL", "")
+        # JIRA_USER_EMAIL is de gekozen naam; JIRA_EMAIL blijft als fallback voor
+        # bestaande configs (boring & auditable: geen stille breaking change).
+        self._email = email or os.environ.get("JIRA_USER_EMAIL") or os.environ.get("JIRA_EMAIL", "")
         self._api_token = api_token or os.environ.get("JIRA_API_TOKEN", "")
         self._jql = default_jql or os.environ.get("JIRA_JQL", "")
+        # Scope-filter op project(en) — immutable runtime-conf. Komma-gescheiden,
+        # bv. JIRA_PROJECTS="ISO" of "ISO,COMP". Wordt als AND-prefix op elke
+        # effectieve JQL gezet (documenten én findings).
+        self._projects = [
+            p.strip() for p in os.environ.get("JIRA_PROJECTS", "").split(",") if p.strip()
+        ]
         self._page_size = page_size
         self._timeout_s = timeout_s
+
+    def _scope_jql(self, base_jql: str) -> str:
+        """Beperk een JQL tot de geconfigureerde projecten (`JIRA_PROJECTS`).
+
+        Geen projecten geconfigureerd → JQL blijft ongewijzigd. Anders wordt
+        `project in ("ISO", …)` als AND-conditie voorgevoegd, zodat een run
+        binnen de ISO-scope blijft, ongeacht de onderliggende query.
+        """
+        if not self._projects:
+            return base_jql
+        quoted = ", ".join(f'"{p}"' for p in self._projects)
+        scope = f"project in ({quoted})"
+        return f"({scope}) AND ({base_jql})" if base_jql.strip() else scope
 
     def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:
         """Iterate over Jira issues; elke issue wordt een `Document`.
@@ -66,7 +89,7 @@ class JiraSource:
         elif self._jql:
             jql = self._jql
 
-        for issue in self._iterate_issues(jql):
+        for issue in self._iterate_issues(self._scope_jql(jql)):
             yield _issue_to_document(issue)
 
     def fetch_content(self, doc: Document) -> str:
@@ -97,7 +120,7 @@ class JiraSource:
             "JIRA_FINDINGS_JQL",
             "labels in (iso27001, iso9001, compliance) AND statusCategory != Done",
         )
-        for issue in self._iterate_issues(findings_jql):
+        for issue in self._iterate_issues(self._scope_jql(findings_jql)):
             yield _issue_to_finding(issue, sessie_id)
 
     def healthcheck(self) -> dict[str, object]:
@@ -106,7 +129,7 @@ class JiraSource:
             return {
                 "status": "fail",
                 "naam": self.naam,
-                "reden": "JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN ontbreken",
+                "reden": "JIRA_BASE_URL / JIRA_USER_EMAIL / JIRA_API_TOKEN ontbreken",
             }
         try:
             resp = self._http_get(f"{self._base_url}/rest/api/3/myself")
