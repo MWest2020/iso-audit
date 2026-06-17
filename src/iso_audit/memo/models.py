@@ -63,6 +63,12 @@ class Finding(BaseModel):
     reasoning: list[str] = Field(default_factory=list)
     # Brondocumenten onder deze bevinding (uitklapbaar in de UI, met links).
     bronnen: list[BronRef] = Field(default_factory=list)
+    # Thema (vaste taxonomie) — groepeert OFI's: één thema aanpakken tilt de
+    # organisatie breed op. Keyword-bepaald (bepaal_thema), geen LLM nodig.
+    thema: str | None = None
+    # NC: concrete voorbeelden van hoe de tool het bewijs idealiter had gezien —
+    # helpt de auditor bij de triage (LLM-gedraft, auditor-spiegel).
+    examples: list[str] = Field(default_factory=list)
     triage_status: TriageStatus = "open"
     # Bij follow_up: LLM-suggestie met wie het bewijs te verifiëren (voorstel
     # tot uitsluiting). Auditor maakt de afspraak.

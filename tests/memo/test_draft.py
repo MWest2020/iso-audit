@@ -102,3 +102,28 @@ def test_draft_aggregeert_bronnen_gededupliceerd(tmp_path: Path) -> None:
     sleutels = {(b.herkomst, b.doc_id) for b in nc.bronnen}
     assert sleutels == {("Drive", "d1"), ("Jira", "ISO-7")}  # dup samengevoegd
     assert len(nc.bronnen) == 2
+
+
+def test_draft_vangt_voorbeelden_en_thema(tmp_path: Path) -> None:
+    """v2-prompt levert 'voorbeelden' → Finding.examples; thema = dominant in cluster."""
+    db = _norm_db(tmp_path)
+    f1, f2 = _f("1", "NC", "6.5"), _f("2", "NC", "6.5")
+    f1.thema = "Documentbeheer"
+    f2.thema = "Documentbeheer"
+
+    block = MagicMock()
+    block.text = (
+        '{"title": "T", "deviation": "d", "corrective_measure": "X.", '
+        '"voorbeelden": ["Een vastgelegd register met eigenaar", "Periodieke review genotuleerd"]}'
+    )
+    resp = MagicMock()
+    resp.content = [block]
+    fake = MagicMock()
+    fake.messages.create.return_value = resp
+
+    with patch.object(draft_mod.anthropic, "Anthropic", return_value=fake):
+        out = draft_findings([f1, f2], norm_db=db, language="nl", top_n=1)
+
+    nc = next(f for f in out if f.severity == "NC")
+    assert nc.examples == ["Een vastgelegd register met eigenaar", "Periodieke review genotuleerd"]
+    assert nc.thema == "Documentbeheer"

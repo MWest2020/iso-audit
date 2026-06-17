@@ -309,6 +309,8 @@ class AuditSession:
             "deviation": doel.deviation or doel.description,
             "verify_with": doel.verify_with or "",
             "bronnen": [b.model_dump() for b in doel.bronnen],
+            "thema": doel.thema or "",
+            "examples": doel.examples,
         }
 
     def conclusion(self) -> dict[str, object]:
@@ -330,7 +332,25 @@ class AuditSession:
             "all_triaged": open_n == 0,
             "saturated": open_n == 0 and follow == 0,
             "advice": advies,
+            "ofi_themes": self._ofi_themes(),
         }
+
+    def _ofi_themes(self) -> list[dict[str, object]]:
+        """OFI's gegroepeerd per thema (aflopend) — verbeter-thematisering.
+
+        Het idee: aan een thema met veel OFI's werken tilt de organisatie breed
+        op. Levert per thema het aantal OFI's + de betrokken clausules.
+        """
+        counts: dict[str, int] = {}
+        clauses: dict[str, set[str]] = {}
+        for f in self.findings():
+            if f.severity != "OFI":
+                continue
+            thema = f.thema or "Overig"
+            counts[thema] = counts.get(thema, 0) + 1
+            clauses.setdefault(thema, set()).add(f.clause)
+        geordend = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+        return [{"thema": t, "count": n, "clauses": sorted(clauses[t])} for t, n in geordend]
 
     def triage_summary(self) -> dict[str, object]:
         """Triage-voortgang: een memo mag pas bij 0 openstaande NC-kandidaten."""

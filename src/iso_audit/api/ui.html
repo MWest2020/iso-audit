@@ -43,6 +43,10 @@
   .det-bron-list { margin:.3rem 0 0 1rem; padding:0; }
   .det-bron-list li { margin-bottom:.4rem; }
   .det-bron-list a { color:var(--blue); }
+  .det-ideal { margin-top:.6rem; padding-top:.4rem; border-top:1px dashed var(--border); }
+  #bulk-bar { margin:.4rem 0; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;
+              padding:.4rem .6rem; background:#f6f8fa; border-radius:6px; }
+  #bulk-bar select { padding:.15rem; }
   .badge-on { color:#1a7d46; font-size:.72rem; }
   .badge-off { color:#9a6700; font-size:.72rem; cursor:help; }
   #bar-wrap { background:var(--border); border-radius:6px; height:14px; margin:.5rem 0; overflow:hidden; }
@@ -82,6 +86,18 @@
     <button class="flt sev-NC" data-sev="NC" onclick="loadFindings('NC')">NC</button>
     <button class="flt sev-OFI" data-sev="OFI" onclick="loadFindings('OFI')">OFI</button>
     <button class="flt sev-POSITIVE" data-sev="POSITIVE" onclick="loadFindings('POSITIVE')">POSITIVE</button>
+  </div>
+  <div id="bulk-bar">
+    <span class="note">Bulk op selectie:</span>
+    <label>classificatie
+      <select id="bulk-sev"><option value="">—</option>
+        <option>NC</option><option>OFI</option><option>POSITIVE</option></select></label>
+    <label>triage
+      <select id="bulk-triage"><option value="">—</option>
+        <option>open</option><option>valide</option><option>niet_valide</option><option>follow_up</option></select></label>
+    <input id="bulk-reason" class="reason" style="width:14rem" placeholder="reden (auditsessie)">
+    <button onclick="bulkApply()">Toepassen op selectie</button>
+    <span id="bulk-msg" class="ok"></span>
   </div>
   <div id="triage-wrap"></div>
   <button id="btn-edit" class="alt" onclick="loadEditor()">Bewerk kop-NC's</button>
@@ -177,6 +193,7 @@ async function loadFindings(severity){
   const fs = await j("/findings" + (_activeFilter ? "?severity="+_activeFilter : ""));
   let rows = fs.map(f => `
     <tr data-id="${f.id}" class="sevrow-${f.severity}">
+      <td><input type="checkbox" class="sel" value="${f.id}"></td>
       <td class="f-title"><span class="exp" onclick="toggleDetail('${f.id}')" title="uitklappen">▸</span> ${escapeHtml(f.title)}</td>
       <td class="f-clause">${f.clause}</td>
       <td>${f.source||"-"}</td>
@@ -187,9 +204,9 @@ async function loadFindings(severity){
       <td><input class="reason" placeholder="reden (auditsessie)"></td>
       <td class="ok"></td>
     </tr>
-    <tr class="detail" id="det-${f.id}" hidden><td colspan="7"><em>laden…</em></td></tr>`).join("");
+    <tr class="detail" id="det-${f.id}" hidden><td colspan="8"><em>laden…</em></td></tr>`).join("");
   document.getElementById("triage-wrap").innerHTML =
-    `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Bron</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<table><thead><tr><th><input type="checkbox" onclick="toggleAll(this)" title="alles selecteren"></th><th>Bevinding</th><th>Clausule</th><th>Bron</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   // Detail (brondocumenten) lazy laden bij eerste uitklap — geen hover meer.
 }
 async function toggleDetail(id){
@@ -212,9 +229,15 @@ async function loadDetail(id){
       return `<li><strong>[${escapeHtml(b.herkomst||"bron")}]</strong> ${link}`
         + (b.beschrijving ? `<br><span class="note">${escapeHtml(b.beschrijving)}</span>` : "") + `</li>`;
     }).join("");
-    det.querySelector("td").innerHTML = bronnen
+    const bronBlok = bronnen
       ? `<strong>Bevinding berust op:</strong><ul class="det-bron-list">${bronnen}</ul>`
       : `<span class="note">Geen brondocumenten gekoppeld.</span>`;
+    // NC: hoe de tool het bewijs idealiter had gezien (helpt de triage).
+    const vb = (c.examples||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("");
+    const vbBlok = vb
+      ? `<div class="det-ideal"><strong>Hoe de tool het had willen zien:</strong><ul class="det-bron-list">${vb}</ul></div>`
+      : "";
+    det.querySelector("td").innerHTML = bronBlok + vbBlok;
     det.dataset.loaded = "1";
   }catch(e){ det.querySelector("td").innerHTML = `<span class="note">Context laden mislukt.</span>`; }
 }
@@ -246,6 +269,26 @@ async function setSev(id,sev,btn){
   btn.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b===btn));
 }
 async function setTriage(id,t){ await post(id,{triage_status:t,reason:reasonFor(id)}); }
+function toggleAll(master){
+  document.querySelectorAll("#triage-wrap .sel").forEach(c=>{ c.checked = master.checked; });
+}
+async function bulkApply(){
+  const ids = [...document.querySelectorAll("#triage-wrap .sel:checked")].map(c=>c.value);
+  const sev = document.getElementById("bulk-sev").value;
+  const tri = document.getElementById("bulk-triage").value;
+  const reason = document.getElementById("bulk-reason").value || "auditsessie (bulk)";
+  const msg = document.getElementById("bulk-msg");
+  if(!ids.length){ msg.textContent = "⚠ niets geselecteerd"; return; }
+  if(!sev && !tri){ msg.textContent = "⚠ kies classificatie of triage"; return; }
+  const body = {reason}; if(sev) body.severity = sev; if(tri) body.triage_status = tri;
+  msg.textContent = "bezig…";
+  for(const id of ids){  // append-only: elke wijziging apart gelogd
+    await fetch(`/findings/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  }
+  msg.textContent = `✓ ${ids.length} bijgewerkt`;
+  await refreshGate();
+  await loadFindings(_activeFilter);  // herlaad: severity/triage-wijzigingen zichtbaar maken
+}
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 async function loadEditor(){
   const fs = await j("/findings?severity=NC");  // alle kop-NC's bewerkbaar tijdens triage
@@ -275,9 +318,16 @@ async function loadConclusion(){
   const c = await j("/conclusion");
   const t = c.tally;
   const el = document.getElementById("conclusion-out"); el.hidden = false;
-  el.textContent =
-    `Valide NC's: ${t.valide} · uitgesloten: ${t.niet_valide} · follow-up: ${t.follow_up} · open: ${t.open}\n\n`+
-    (c.saturated ? "✅ " : "⚠️ ") + c.advice;
+  // OFI-thematisering: aan een thema met veel OFI's werken tilt de org breed op.
+  const themes = (c.ofi_themes||[]).map(x=>
+    `<li><strong>${escapeHtml(x.thema)}</strong> — ${x.count} OFI('s) <span class="note">(§${x.clauses.join(", §")})</span></li>`
+  ).join("");
+  el.innerHTML =
+    `<div>Valide NC's: ${t.valide} · uitgesloten: ${t.niet_valide} · follow-up: ${t.follow_up} · open: ${t.open}</div>`+
+    `<div style="margin:.5rem 0">${c.saturated ? "✅ " : "⚠️ "}${escapeHtml(c.advice)}</div>`+
+    (themes ? `<div class="det-ideal"><strong>Verbeter-thema's (OFI) — grootste hefboom eerst:</strong>`+
+              `<ul class="det-bron-list">${themes}</ul>`+
+              `<span class="note">Eén thema breed aanpakken tilt meerdere clausules tegelijk op.</span></div>` : "");
 }
 async function preview(){
   document.getElementById("memo-frame").innerHTML = `<iframe src="/memo/preview"></iframe>`;

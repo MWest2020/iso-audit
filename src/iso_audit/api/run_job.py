@@ -75,6 +75,7 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
     import sqlite3
 
     from iso_audit.classification.clause_mapping import laad_clause_map
+    from iso_audit.classification.thema import bepaal_thema
     from iso_audit.store import verbinding
 
     titels = laad_clause_map(norm).get("clausules", {})
@@ -90,6 +91,13 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
         herkomst = r["herkomst"] or ""
         doc_id = r["doc_id"] or ""
         beschrijving = r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)"
+        thema = bepaal_thema(
+            {
+                "beschrijving": r["beschrijving"],
+                "onderbouwing": r["onderbouwing"],
+                "document_naam": r["document_naam"],
+            }
+        )
         findings.append(
             Finding(
                 id=str(r["id"]),
@@ -97,6 +105,7 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
                 standard=_resolve_standard(r["norm"], clausule, db),
                 clause=clausule,
                 source=herkomst,  # bevinding berust op bron Y (Drive/Miro/…)
+                thema=thema,
                 # Geen "NC"-prefix: niet elke bevinding is een NC (ook OFI/positief).
                 title=f"§{clausule} — {titel} [{(r['document_naam'] or '?')[:50]}]",
                 description=beschrijving,

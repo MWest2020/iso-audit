@@ -71,7 +71,7 @@ def _draft_cluster(
     titel = _clausule_titel(norm_db, standard, clause, language)
     findings_blok = "\n".join(f"- {f.description[:200]}" for f in cluster)
     prompt = _laad_prompt(
-        "nc_draft_v1",
+        "nc_draft_v2",
         {
             "clausule": clause,
             "clausule_titel": titel,
@@ -101,6 +101,12 @@ def _draft_cluster(
                 continue
             gezien.add(sleutel)
             bron_refs.append(b)
+    # Dominante thema van het cluster (meest voorkomend) — voor OFI-thematisering.
+    themas = [f.thema for f in cluster if f.thema]
+    thema = max(set(themas), key=themas.count) if themas else None
+    # Voorbeelden: hoe de tool het bewijs idealiter had gezien (LLM, v2-prompt).
+    rauwe_vb = data.get("voorbeelden") or []
+    examples = [str(v) for v in rauwe_vb if str(v).strip()] if isinstance(rauwe_vb, list) else []
     return Finding(
         id=f"nc-{clause}",
         severity="NC",
@@ -115,6 +121,8 @@ def _draft_cluster(
         actions=[ActionRow(wat="(actie in te vullen door auditor)")],
         reasoning=reasoning,
         bronnen=bron_refs,
+        thema=thema,
+        examples=examples,
         triage_status="open",
         verify_with=str(data.get("verify_with") or "") or None,
     )

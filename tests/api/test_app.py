@@ -44,6 +44,65 @@ def _client(tmp_path: Path) -> TestClient:
     return TestClient(create_app(session))
 
 
+def _client_met(tmp_path: Path, findings: list[dict[str, object]]) -> TestClient:
+    (tmp_path / "findings.json").write_text(json.dumps(findings), encoding="utf-8")
+    session = AuditSession(
+        tmp_path,
+        profile=str(_EX / "conduction.profile.yaml"),
+        norms_dir="examples/norms",
+        memo_input_path=str(_EX / "memo-input.yaml"),
+    )
+    return TestClient(create_app(session))
+
+
+def test_conclusion_ofi_themes(tmp_path: Path) -> None:
+    """OFI's gegroepeerd per thema, aflopend; NC's tellen niet mee."""
+    findings: list[dict[str, object]] = [
+        {
+            "id": "a",
+            "severity": "OFI",
+            "standard": "iso-9001-2015",
+            "clause": "7.1",
+            "title": "x",
+            "description": "d",
+            "thema": "Documentbeheer",
+        },
+        {
+            "id": "b",
+            "severity": "OFI",
+            "standard": "iso-9001-2015",
+            "clause": "7.5",
+            "title": "y",
+            "description": "d",
+            "thema": "Documentbeheer",
+        },
+        {
+            "id": "c",
+            "severity": "OFI",
+            "standard": "iso-9001-2015",
+            "clause": "9.1",
+            "title": "z",
+            "description": "d",
+            "thema": "Monitoring en meting",
+        },
+        {
+            "id": "n",
+            "severity": "NC",
+            "standard": "iso-9001-2015",
+            "clause": "10.2",
+            "title": "nc",
+            "description": "d",
+            "triage_status": "valide",
+            "thema": "Documentbeheer",
+        },
+    ]
+    themes = _client_met(tmp_path, findings).get("/conclusion").json()["ofi_themes"]
+    assert themes[0]["thema"] == "Documentbeheer"  # grootste eerst
+    assert themes[0]["count"] == 2
+    assert themes[0]["clauses"] == ["7.1", "7.5"]
+    assert {t["thema"] for t in themes} == {"Documentbeheer", "Monitoring en meting"}  # NC niet
+
+
 def test_get_findings(tmp_path: Path) -> None:
     r = _client(tmp_path).get("/findings")
     assert r.status_code == 200

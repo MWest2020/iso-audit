@@ -6,6 +6,27 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-17 — triage: NC-voorbeelden, OFI-thematisering, bulk-wijziging
+
+Drie auditor-hulpmiddelen op de triage-flow:
+
+- **NC-voorbeelden** ("hoe de tool het had willen zien"): nieuwe versie-prompt
+  `nc_draft_v2.md` (= v1 + veld `voorbeelden`: 2-3 concrete conformante
+  praktijken) + `Finding.examples`. De uitklap toont ze onder de bronnen — helpt
+  de auditor inschatten of de NC terecht is (auditor-spiegel). Versiegestuurd:
+  v1 blijft bestaan; `draft.py` laadt nu v2.
+- **OFI-thematisering**: `Finding.thema` (keyword-taxonomie `bepaal_thema`, geen
+  LLM) wordt gezet bij export (per bevinding) en bij de kop-NC-draft (dominant
+  thema van het cluster). `conclusion()` levert `ofi_themes` — OFI's gegroepeerd
+  per thema, aflopend, met betrokken clausules. Conclusie-view toont "verbeter-
+  thema's, grootste hefboom eerst": één thema breed aanpakken tilt de organisatie
+  op meerdere clausules tegelijk.
+- **Bulk-triage**: checkbox per rij + "alles selecteren"; een bulk-balk zet
+  classificatie en/of triage-status (met reden) op de hele selectie in één keer.
+  Hergebruikt het append-only `POST /findings/{id}` per item.
+- **Tests**: examples+thema-capture in de draft, `ofi_themes`-groepering in de
+  conclusie. 754 groen; ruff/format/mypy clean.
+
 ### Added — 2026-06-17 — triage-UI: uitklapbare bronlinks + severity-kleuren + filter
 
 Auditor-spiegel-verfijning op de triage-tabel (`api/ui.html` + ondersteunende
