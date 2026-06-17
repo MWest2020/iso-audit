@@ -29,6 +29,41 @@ class SessionError(ValueError):
     """Sessie kon niet geladen worden of een actie is ongeldig."""
 
 
+def _miro_health() -> dict[str, object]:
+    """Pseudo-source Miro: gekoppeld zodra het API-token gezet is (READ-only)."""
+    import os
+
+    if os.environ.get("MIRO_API_TOKEN"):
+        return {"connected": True, "status": "ok", "naam": "miro", "tenant": "MIRO_API_TOKEN"}
+    return {
+        "connected": False,
+        "status": "fail",
+        "naam": "miro",
+        "reden": "MIRO_API_TOKEN ontbreekt",
+    }
+
+
+def _check_source(naam: str) -> dict[str, object]:
+    """Instantieer één bron-adapter en draai zijn ``healthcheck()``.
+
+    Een exception (geen config, geen auth, netwerk down) betekent: niet
+    gekoppeld. We vangen breed — een falende healthcheck mag de UI nooit breken.
+    """
+    if naam == "miro":
+        return _miro_health()
+    from iso_audit import sources as source_registry
+
+    try:
+        adapter = source_registry.get(naam)()
+        # Lichte `probe()` als de adapter die biedt (bv. Drive — anders zou de
+        # volledige recursieve healthcheck minuten duren); anders healthcheck().
+        check = getattr(adapter, "probe", None) or adapter.healthcheck
+        hc = check()
+    except Exception as exc:
+        return {"connected": False, "status": "fail", "naam": naam, "reden": str(exc)[:200]}
+    return {"connected": hc.get("status") == "ok", **hc}
+
+
 @dataclass
 class _RunState:
     """Voortgang van de stap-2-run (indexatie/timer of live pipeline)."""
@@ -148,6 +183,19 @@ class AuditSession:
             "norms": laad_norm_db(self._norms_dir).standards(),
             "sources": beschikbare_bronnen(),
         }
+
+    def source_health(self) -> dict[str, dict[str, object]]:
+        """Korte healthcheck per bron — de UI greyt niet-gekoppelde bronnen uit.
+
+        Per bron: ``connected`` (bool) plus de ruwe healthcheck-velden (status,
+        reden, tenant, …). Een bron die niet instantieerbaar is of waarvan
+        ``healthcheck()`` faalt, geldt als **niet-gekoppeld** en is niet
+        selecteerbaar voor een run. Boring & auditable: geen geheime
+        connectiviteitslogica — elke bron rapporteert zijn eigen status.
+        """
+        from iso_audit.ingest import beschikbare_bronnen
+
+        return {naam: _check_source(naam) for naam in beschikbare_bronnen()}
 
     def start_run(
         self,

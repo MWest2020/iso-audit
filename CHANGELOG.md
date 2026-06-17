@@ -6,6 +6,32 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-17 — bron-healthcheck + UI grey-out van niet-gekoppelde bronnen
+
+Connectoren-fase, stap 1: voorkomen dat de auditor een bron selecteert die niet
+gekoppeld is. Hoort bij de `auditmemo-ui`-flow.
+
+- **`GET /config/health`** (`api/app.py`) → `AuditSession.source_health()`
+  (`api/session.py`): draait per geregistreerde bron een korte connectiviteits-
+  check en levert `{naam: {connected: bool, status, reden, …}}`. Brede
+  exception-vang: een falende healthcheck markeert de bron als niet-gekoppeld,
+  breekt nooit de UI.
+- **Drive `probe()`** (`sources/drive.py` + `clients/gws.py
+  gws_drive_bereikbaar`): lichte reachability-check (één bounded `files list`,
+  pageSize=1, niet-recursief) i.p.v. de volledige recursieve `healthcheck()`
+  (die minuten duurt). `_check_source` gebruikt `probe()` als de adapter die
+  biedt, anders `healthcheck()`. Miro (pseudo-source) = `MIRO_API_TOKEN`-presence.
+- **UI** (`api/ui.html` `loadConfig`): bronnen zonder verbinding worden greyed-out
+  (disabled + uitgevinkt) met een ● gekoppeld / ⚠ niet-gekoppeld-badge en de
+  reden in de tooltip. Gekoppelde bronnen blijven default aangevinkt.
+- **Jira**: `JiraSource` (sinds milestone C) gebruikt een persoonlijke Atlassian
+  API-token (`JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, basic auth);
+  healthcheck via `/rest/api/3/myself`. NB: `run_audit` ingest is nog hardcoded
+  op Drive+Miro — een gekoppelde Jira draagt nog niets bij tot de ingest over
+  de geselecteerde sources itereert (volgende connector-stap).
+- **Tests**: 3 hermetische tests in `tests/api/test_app.py` (endpoint-bedrading,
+  `probe()`-voorkeur, miro-token). Geen netwerk; `_check_source`/registry gestubd.
+
 ### Added — 2026-06-15 — `iso-audit memo`: management-auditmemo uit findings
 
 Change `auditmemo-management` (MVP). Genereert de management-one-pager

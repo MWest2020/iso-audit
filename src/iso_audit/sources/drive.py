@@ -203,6 +203,21 @@ class DriveSource:
         del sessie_id
         return iter([])
 
+    def probe(self) -> dict[str, object]:
+        """Lichte connectiviteits-probe voor de UI grey-out (geen volledige listing).
+
+        Eén bounded `files list` per folder (pageSize=1, niet-recursief) — bewijst
+        auth + bereikbaarheid in een fractie van de tijd van ``healthcheck()``.
+        """
+        from iso_audit.clients.gws import gws_drive_bereikbaar
+
+        for fid in self._folder_ids:
+            try:
+                gws_drive_bereikbaar(fid, drive_id=self._drive_id_voor[fid])
+            except Exception as e:
+                return {"status": "fail", "naam": self.naam, "tenant": fid, "reden": str(e)[:200]}
+        return {"status": "ok", "naam": self.naam, "folders": list(self._folder_ids)}
+
     def healthcheck(self) -> dict[str, object]:
         """Verifieer dat alle geconfigureerde Drive-locaties bereikbaar zijn."""
         per_folder: dict[str, int] = {}

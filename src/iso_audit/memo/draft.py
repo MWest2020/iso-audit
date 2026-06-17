@@ -89,9 +89,7 @@ def _draft_cluster(
     extra = sorted({f.clause for f in cluster} - {clause})
     bronnen = sorted({f.source for f in cluster if f.source})
     # Redenatie-lijst: wat de tool per bevinding aantrof + de bron — basis voor triage.
-    reasoning = [
-        f"[{f.source or 'bron'}] {f.description[:160]}" for f in cluster if f.description
-    ]
+    reasoning = [f"[{f.source or 'bron'}] {f.description[:160]}" for f in cluster if f.description]
     return Finding(
         id=f"nc-{clause}",
         severity="NC",

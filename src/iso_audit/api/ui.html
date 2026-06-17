@@ -28,6 +28,9 @@
   input.reason { width:100%; border:1px solid var(--border); border-radius:4px; padding:.2rem; }
   iframe { width:100%; height:520px; border:1px solid var(--border); border-radius:6px; margin-top:.5rem; }
   .ok { color:#1a7d46; font-size:.8rem; }
+  .src-off { opacity:.5; }
+  .badge-on { color:#1a7d46; font-size:.72rem; }
+  .badge-off { color:#9a6700; font-size:.72rem; cursor:help; }
   #bar-wrap { background:var(--border); border-radius:6px; height:14px; margin:.5rem 0; overflow:hidden; }
   #bar { background:var(--blue); height:100%; width:0; transition:width .3s; }
   #tip { position:fixed; display:none; max-width:480px; background:#1a1a1a; color:#fff;
@@ -87,14 +90,23 @@ const TRIAGE = ["open","valide","niet_valide","follow_up"];
 const j = async (url,opts) => (await fetch(url,opts)).json();
 
 async function loadConfig(){
-  const o = await j("/config/options");
+  const [o, health] = await Promise.all([j("/config/options"), j("/config/health")]);
   const el = document.getElementById("config-form"); el.hidden = false;
   el.innerHTML =
     `<strong>Normen:</strong><br>` +
     o.norms.map(n=>`<label><input type="checkbox" class="cfg-norm" value="${n}" checked> ${n}</label> `).join("") +
     `<br><br><strong>Bronnen:</strong><br>` +
-    o.sources.map(s=>`<label><input type="checkbox" class="cfg-src" value="${s}" checked> ${s}</label> `).join("") +
-    `<br><span class="note">Niet-aangevinkte bronnen vallen buiten de run-scope.</span>`;
+    o.sources.map(s=>{
+      const h = health[s] || {};
+      // Niet-gekoppeld = greyed out (disabled + uitgevinkt), met reden in de tooltip.
+      const off = !h.connected;
+      const badge = off ? `<span class="badge-off" data-tip="${(h.reden||'niet gekoppeld')}">⚠ niet gekoppeld</span>`
+                        : `<span class="badge-on">● gekoppeld</span>`;
+      return `<label class="${off?'src-off':''}"><input type="checkbox" class="cfg-src" value="${s}" `+
+             `${off?'disabled':'checked'}> ${s} ${badge}</label> `;
+    }).join("") +
+    `<br><span class="note">Niet-aangevinkte bronnen vallen buiten de run-scope. `+
+    `Greyed-out bronnen zijn niet gekoppeld (healthcheck faalt) — koppel ze via hun env-vars.</span>`;
 }
 function selectedConfig(){
   return {

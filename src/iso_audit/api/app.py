@@ -123,6 +123,11 @@ def create_app(session: AuditSession) -> FastAPI:
         """Stap 1: beschikbare normen + bronnen om de run te configureren."""
         return session.config_options()
 
+    @app.get("/config/health")
+    def config_health() -> dict[str, dict[str, object]]:
+        """Korte per-bron healthcheck; de UI greyt niet-gekoppelde bronnen uit."""
+        return session.source_health()
+
     @app.post("/run/start")
     def run_start(req: RunStartRequest | None = None) -> dict[str, object]:
         """Stap 2: start de run (live pipeline of sim-timer); voortgang via /run/progress."""

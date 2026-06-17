@@ -146,6 +146,28 @@ def gws_lijst_bestanden(folder_id: str, drive_id: str | None = None) -> list[dic
     return alle
 
 
+def gws_drive_bereikbaar(folder_id: str, drive_id: str | None = None) -> None:
+    """Lichte reachability-probe: één niet-recursieve `files list` (pageSize=1).
+
+    Bewijst dat `gws` geauthenticeerd is én de folder bereikbaar — zonder de
+    folder recursief te enumereren (dat is wat ``gws_lijst_bestanden`` doet en
+    kan minuten duren). Bedoeld voor de pre-run healthcheck/grey-out in de UI.
+
+    :raises: propageert de onderliggende `gws`-fout als de probe faalt.
+    """
+    params: dict[str, Any] = {
+        "q": f"'{folder_id}' in parents and trashed=false",
+        "fields": "files(id)",
+        "pageSize": 1,
+        "supportsAllDrives": True,
+        "includeItemsFromAllDrives": True,
+    }
+    if drive_id:
+        params["corpora"] = "drive"
+        params["driveId"] = drive_id
+    _gws("drive", "files", "list", params=params)
+
+
 def gws_exporteer_google_doc(file_id: str) -> str:
     """Exporteer een Google Doc als plain text via `gws drive files export`."""
     inhoud = _gws_binary(

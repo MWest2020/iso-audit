@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from iso_audit.api.app import create_app
@@ -154,6 +155,67 @@ def test_config_options(tmp_path: Path) -> None:
     d = _client(tmp_path).get("/config/options").json()
     assert "iso-9001-2015" in d["norms"] and "iso-27001-2022" in d["norms"]
     assert "drive" in d["sources"]  # registry
+
+
+def test_config_health_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Het endpoint levert per bron de `_check_source`-uitkomst terug.
+
+    `_check_source` gestubd → deterministisch, geen netwerk. Test dat de UI per
+    geregistreerde bron een `connected`-bool + naam krijgt.
+    """
+    import iso_audit.api.session as sess
+
+    def _fake(naam: str) -> dict[str, object]:
+        return {"connected": naam == "drive", "status": "ok", "naam": naam}
+
+    monkeypatch.setattr(sess, "_check_source", _fake)
+    h = _client(tmp_path).get("/config/health").json()
+    assert {"drive", "jira", "miro", "planning"} <= set(h)
+    assert h["drive"]["connected"] is True
+    assert h["jira"]["connected"] is False
+    for naam, status in h.items():
+        assert status["naam"] == naam
+
+
+def test_check_source_prefers_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`_check_source` gebruikt de lichte `probe()` als die bestaat, anders healthcheck."""
+    import iso_audit.api.session as sess
+
+    class _MetProbe:
+        naam = "drive"
+        gebruikt = ""
+
+        def probe(self) -> dict[str, object]:
+            type(self).gebruikt = "probe"
+            return {"status": "ok", "naam": "drive"}
+
+        def healthcheck(self) -> dict[str, object]:  # mag NIET aangeroepen worden
+            type(self).gebruikt = "healthcheck"
+            return {"status": "ok", "naam": "drive"}
+
+    class _ZonderProbe:
+        naam = "jira"
+
+        def healthcheck(self) -> dict[str, object]:
+            return {"status": "fail", "naam": "jira", "reden": "geen creds"}
+
+    fakes = {"drive": _MetProbe, "jira": _ZonderProbe}
+    monkeypatch.setattr("iso_audit.sources.get", lambda naam: fakes[naam])
+
+    drive = sess._check_source("drive")
+    assert drive["connected"] is True and _MetProbe.gebruikt == "probe"
+    jira = sess._check_source("jira")
+    assert jira["connected"] is False and jira["reden"] == "geen creds"
+
+
+def test_check_source_miro_via_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Miro (pseudo-source) is gekoppeld zodra MIRO_API_TOKEN gezet is."""
+    import iso_audit.api.session as sess
+
+    monkeypatch.setenv("MIRO_API_TOKEN", "tok")
+    assert sess._check_source("miro")["connected"] is True
+    monkeypatch.delenv("MIRO_API_TOKEN", raising=False)
+    assert sess._check_source("miro")["connected"] is False
 
 
 def test_run_met_config(tmp_path: Path) -> None:
