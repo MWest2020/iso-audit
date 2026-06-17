@@ -16,8 +16,10 @@ modellen). Drie wensen uit de demo:
   `export_db_findings` legt per bevinding de bron vast met een **klikbare URL**
   (`_bron_url`: Drive → `drive.google.com/open?id=`, Jira → `<base>/browse/<key>`,
   Miro → board-widget); de kop-NC-draft **bundelt** de bronnen van zijn cluster
-  (gededupliceerd op herkomst+id). Elke rij klapt uit met de links + per bron de
-  reden, plus het "waarom NC-kandidaat". `finding_context` levert `bronnen` mee.
+  (gededupliceerd op herkomst+id). Elke rij klapt uit met één lijst — per
+  brondocument de link + de beschrijving (= wat de tool aantrof). `finding_context`
+  levert `bronnen` mee. De aparte hover-tooltips op de triage-rijen zijn
+  verwijderd (redundant met de uitklap); de uitklap laadt lazy bij openen.
 - **Severity-onderscheid**: niet elke bevinding is een NC. De DB-export-titel
   had altijd het misleidende prefix "NC clausule …"; nu neutraal "§<clausule> —
   …". Severity-badges + rij-rand gekleurd (NC=rood, OFI=amber, POSITIVE=groen).

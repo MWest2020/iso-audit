@@ -40,9 +40,9 @@
   .flt[aria-pressed="true"] { outline:2px solid var(--blue); font-weight:600; }
   .exp { cursor:pointer; user-select:none; color:var(--blue); font-weight:700; margin-right:.2rem; }
   tr.detail > td { background:#f6f8fa; font-size:.85rem; padding:.5rem .7rem; }
-  .det-why { white-space:normal; margin-bottom:.5rem; }
-  .det-bron ul { margin:.2rem 0 0 1rem; padding:0; }
-  .det-bron a { color:var(--blue); }
+  .det-bron-list { margin:.3rem 0 0 1rem; padding:0; }
+  .det-bron-list li { margin-bottom:.4rem; }
+  .det-bron-list a { color:var(--blue); }
   .badge-on { color:#1a7d46; font-size:.72rem; }
   .badge-off { color:#9a6700; font-size:.72rem; cursor:help; }
   #bar-wrap { background:var(--border); border-radius:6px; height:14px; margin:.5rem 0; overflow:hidden; }
@@ -177,8 +177,8 @@ async function loadFindings(severity){
   const fs = await j("/findings" + (_activeFilter ? "?severity="+_activeFilter : ""));
   let rows = fs.map(f => `
     <tr data-id="${f.id}" class="sevrow-${f.severity}">
-      <td class="f-title" style="cursor:help"><span class="exp" onclick="toggleDetail('${f.id}')" title="uitklappen">▸</span> ${escapeHtml(f.title)}</td>
-      <td class="f-clause" style="cursor:help">${f.clause}</td>
+      <td class="f-title"><span class="exp" onclick="toggleDetail('${f.id}')" title="uitklappen">▸</span> ${escapeHtml(f.title)}</td>
+      <td class="f-clause">${f.clause}</td>
       <td>${f.source||"-"}</td>
       <td>${SEV.map(s=>`<button class="sev sev-${s}" aria-pressed="${f.severity===s}" onclick="setSev('${f.id}','${s}',this)">${s}</button>`).join(" ")}</td>
       <td><select onchange="setTriage('${f.id}',this.value)">
@@ -190,41 +190,33 @@ async function loadFindings(severity){
     <tr class="detail" id="det-${f.id}" hidden><td colspan="7"><em>laden…</em></td></tr>`).join("");
   document.getElementById("triage-wrap").innerHTML =
     `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Bron</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
-  for(const f of fs){ enrichTooltip(f.id); }
+  // Detail (brondocumenten) lazy laden bij eerste uitklap — geen hover meer.
 }
-function toggleDetail(id){
+async function toggleDetail(id){
   const row = document.getElementById("det-"+id);
   if(!row) return;
   row.hidden = !row.hidden;
   const caret = document.querySelector(`tr[data-id="${id}"] .exp`);
   if(caret) caret.textContent = row.hidden ? "▸" : "▾";
+  if(!row.hidden && !row.dataset.loaded){ await loadDetail(id); }
 }
-async function enrichTooltip(id){
+async function loadDetail(id){
+  const det = document.getElementById("det-"+id);
+  if(!det) return;
   try{
     const c = await j("/findings/"+id+"/context");
-    const tr = document.querySelector(`tr[data-id="${id}"]`);
-    if(!tr) return;
-    const norm = c.citations.map(x=>`${x.standard} §${x.clause} — ${x.title}\n"${x.text}"`).join("\n\n");
-    if(norm) tr.querySelector("td.f-clause").dataset.tip = norm;  // hover clausule = échte normtekst
-    const why = (c.reasoning && c.reasoning.length ? "Waarom NC-kandidaat (wat de tool aantrof):\n- "+c.reasoning.join("\n- ") : "")
-      + (c.deviation ? "\n\nAfwijking:\n"+c.deviation.replace(/<[^>]+>/g,"") : "")
-      + (c.verify_with ? "\n\nVoorstel tot uitsluiting — verifiëren met: "+c.verify_with : "");
-    if(why.trim()) tr.querySelector("td.f-title").dataset.tip = why.trim();  // hover bevinding = waarom
-    // Uitklap-detail: klikbare links naar de brondocumenten + waarom (per bron).
-    const det = document.getElementById("det-"+id);
-    if(det){
-      const bronnen = (c.bronnen||[]).map(b=>{
-        const label = escapeHtml(b.doc_naam || b.doc_id || b.herkomst || "bron");
-        const link = b.url ? `<a href="${b.url}" target="_blank" rel="noopener">${label}</a>` : label;
-        return `<li><strong>[${escapeHtml(b.herkomst||"bron")}]</strong> ${link}`
-          + (b.beschrijving ? `<br><span class="note">${escapeHtml(b.beschrijving)}</span>` : "") + `</li>`;
-      }).join("");
-      det.querySelector("td").innerHTML =
-        (why.trim() ? `<div class="det-why">${escapeHtml(why).replace(/\n/g,"<br>")}</div>` : "")
-        + (bronnen ? `<div class="det-bron"><strong>Brondocumenten:</strong><ul>${bronnen}</ul></div>`
-                   : `<span class="note">Geen brondocument-links beschikbaar.</span>`);
-    }
-  }catch(e){ /* hover-context is best-effort */ }
+    // Eén lijst: per brondocument een link + de beschrijving (wat de tool aantrof).
+    const bronnen = (c.bronnen||[]).map(b=>{
+      const label = escapeHtml(b.doc_naam || b.doc_id || b.herkomst || "bron");
+      const link = b.url ? `<a href="${b.url}" target="_blank" rel="noopener">${label}</a>` : label;
+      return `<li><strong>[${escapeHtml(b.herkomst||"bron")}]</strong> ${link}`
+        + (b.beschrijving ? `<br><span class="note">${escapeHtml(b.beschrijving)}</span>` : "") + `</li>`;
+    }).join("");
+    det.querySelector("td").innerHTML = bronnen
+      ? `<strong>Bevinding berust op:</strong><ul class="det-bron-list">${bronnen}</ul>`
+      : `<span class="note">Geen brondocumenten gekoppeld.</span>`;
+    det.dataset.loaded = "1";
+  }catch(e){ det.querySelector("td").innerHTML = `<span class="note">Context laden mislukt.</span>`; }
 }
 function reasonFor(id){
   const tr = document.querySelector(`tr[data-id="${id}"]`);
