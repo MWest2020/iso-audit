@@ -52,6 +52,7 @@ class FindingSummary(BaseModel):
     clause: str
     title: str
     triage_status: TriageStatus
+    source: str | None = None  # bevinding berust op bron Y
 
 
 def create_app(session: AuditSession) -> FastAPI:
@@ -67,6 +68,7 @@ def create_app(session: AuditSession) -> FastAPI:
                 clause=f.clause,
                 title=f.title,
                 triage_status=f.triage_status,
+                source=f.source,
             )
             for f in session.findings()
             if severity is None or f.severity == severity
@@ -92,6 +94,7 @@ def create_app(session: AuditSession) -> FastAPI:
             clause=f.clause,
             title=f.title,
             triage_status=f.triage_status,
+            source=f.source,
         )
 
     @app.get("/findings/{finding_id}", response_model=Finding)

@@ -34,6 +34,7 @@ class Finding(BaseModel):
     description: str
     evidence: list[str] = Field(default_factory=list)
     extra_clauses: list[str] = Field(default_factory=list)  # extra geciteerde clausules
+    source: str | None = None  # herkomst-bron: bevinding berust op bron Y (Drive/Miro/…)
     source_memo: str | None = None
     promote_to_improvement: bool = False
     # Optionele, auditor-geleverde redactie voor de memo. Afwezig → builder

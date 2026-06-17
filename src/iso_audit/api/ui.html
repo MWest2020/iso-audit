@@ -143,6 +143,7 @@ async function loadFindings(severity){
   let rows = fs.map(f => `
     <tr data-id="${f.id}">
       <td class="f-title" style="cursor:help">${f.title}</td><td class="f-clause" style="cursor:help">${f.clause}</td>
+      <td>${f.source||"-"}</td>
       <td>${SEV.map(s=>`<button class="sev" aria-pressed="${f.severity===s}" onclick="setSev('${f.id}','${s}',this)">${s}</button>`).join(" ")}</td>
       <td><select onchange="setTriage('${f.id}',this.value)">
         ${TRIAGE.map(t=>`<option value="${t}" ${f.triage_status===t?"selected":""}>${t}</option>`).join("")}
@@ -151,7 +152,7 @@ async function loadFindings(severity){
       <td class="ok"></td>
     </tr>`).join("");
   document.getElementById("triage-wrap").innerHTML =
-    `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Bron</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   for(const f of fs){ enrichTooltip(f.id); }
 }
 async function enrichTooltip(id){

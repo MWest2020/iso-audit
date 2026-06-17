@@ -71,6 +71,7 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
                 severity=_SEV.get(r["classificatie"], "UNCLASSIFIED"),  # type: ignore[arg-type]
                 standard=_resolve_standard(r["norm"], clausule, db),
                 clause=clausule,
+                source=r["herkomst"],  # bevinding berust op bron Y (Drive/Miro/…)
                 title=f"NC clausule {clausule} — {titel} [{(r['document_naam'] or '?')[:50]}]",
                 description=r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)",
             )

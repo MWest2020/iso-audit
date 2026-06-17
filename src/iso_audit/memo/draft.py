@@ -87,8 +87,11 @@ def _draft_cluster(
     )
     data = _parse_json(message.content[0].text)  # type: ignore[union-attr]
     extra = sorted({f.clause for f in cluster} - {clause})
-    # Redenatie-lijst: wat de tool per bevinding aantrof — basis voor auditor-triage.
-    reasoning = [f.description[:180] for f in cluster if f.description]
+    bronnen = sorted({f.source for f in cluster if f.source})
+    # Redenatie-lijst: wat de tool per bevinding aantrof + de bron — basis voor triage.
+    reasoning = [
+        f"[{f.source or 'bron'}] {f.description[:160]}" for f in cluster if f.description
+    ]
     return Finding(
         id=f"nc-{clause}",
         severity="NC",
@@ -96,6 +99,7 @@ def _draft_cluster(
         clause=clause,
         extra_clauses=extra,
         title=str(data.get("title") or f"NC clausule {clause}"),
+        source=", ".join(bronnen) or None,
         description=f"Gedistilleerd uit {len(cluster)} ruwe NC-bevindingen op clausule {clause}.",
         deviation=str(data.get("deviation") or ""),
         corrective_measure=str(data.get("corrective_measure") or ""),
