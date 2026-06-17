@@ -102,6 +102,7 @@ def _draft_cluster(
         actions=[ActionRow(wat="(actie in te vullen door auditor)")],
         reasoning=reasoning,
         triage_status="open",
+        verify_with=str(data.get("verify_with") or "") or None,
     )
 
 

@@ -96,7 +96,24 @@ def test_finding_context_hover(tmp_path: Path) -> None:
     assert c["citations"]  # 6.5 resolvet in de voorbeeld-norm-DB
     assert c["citations"][0]["clause"] == "6.5"
     assert c["citations"][0]["text"]  # échte normtekst voor de hover
-    assert "deviation" in c and "reasoning" in c
+    assert "deviation" in c and "reasoning" in c and "verify_with" in c
+
+
+def test_conclusion_saturatie(tmp_path: Path) -> None:
+    # f1 is NC + valide (fixture), geen open/follow-up → verzadigd.
+    c = _client(tmp_path).get("/conclusion").json()
+    assert c["tally"]["valide"] == 1 and c["tally"]["open"] == 0
+    assert c["saturated"] is True
+    assert "saturatie" in c["advice"].lower() or "memo" in c["advice"].lower()
+
+
+def test_follow_up_blokkeert_saturatie(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.post("/findings/f1", json={"triage_status": "follow_up", "reason": "bewijs ophalen"})
+    c = client.get("/conclusion").json()
+    assert c["tally"]["follow_up"] == 1
+    assert c["saturated"] is False
+    assert "meer audits" in c["advice"].lower()
 
 
 def test_tekst_redactie_append_only(tmp_path: Path) -> None:

@@ -58,26 +58,32 @@
 </div>
 
 <div class="step">
-  <h2><span class="num">3</span>Triage <span class="note">— bevestig of pen om; append-only vastgelegd</span></h2>
+  <h2><span class="num">3</span>Triage + bewerken <span class="note">— valide / niet-valide / follow-up; append-only</span></h2>
   <button onclick="loadFindings('NC')">Laad NC-kandidaten</button>
   <button class="alt" onclick="loadFindings()">Toon alle findings</button>
   <div id="triage-wrap"></div>
+  <button id="btn-edit" class="alt" onclick="loadEditor()">Bewerk kop-NC's</button>
+  <div id="editor"></div>
+</div>
+
+<div class="step">
+  <h2><span class="num">4</span>Conclusie <span class="note">— saturatie: genoeg of meer audits nodig</span></h2>
+  <button onclick="loadConclusion()">Toon conclusie</button>
+  <div id="conclusion-out" class="out" hidden></div>
 </div>
 
 <div class="step" id="memo-step">
-  <h2><span class="num">4</span>Management-memo</h2>
+  <h2><span class="num">5</span>Management-memo</h2>
   <p id="gate-msg" class="note"></p>
-  <button id="btn-edit" class="alt" onclick="loadEditor()">Bewerk kop-NC's</button>
   <button id="btn-preview" onclick="preview()">Genereer preview</button>
   <button id="btn-export" class="alt" onclick="exportPdf()">Exporteer PDF</button>
   <span id="memo-msg" class="ok"></span>
-  <div id="editor"></div>
   <div id="memo-frame"></div>
 </div>
 
 <script>
 const SEV = ["NC","OFI","POSITIVE"];
-const TRIAGE = ["open","valide","niet_valide"];
+const TRIAGE = ["open","valide","niet_valide","follow_up"];
 const j = async (url,opts) => (await fetch(url,opts)).json();
 
 async function loadConfig(){
@@ -156,7 +162,8 @@ async function enrichTooltip(id){
     const norm = c.citations.map(x=>`${x.standard} §${x.clause} — ${x.title}\n"${x.text}"`).join("\n\n");
     if(norm) tr.querySelector("td.f-clause").dataset.tip = norm;  // hover clausule = échte normtekst
     const why = (c.reasoning && c.reasoning.length ? "Waarom NC-kandidaat (wat de tool aantrof):\n- "+c.reasoning.join("\n- ") : "")
-      + (c.deviation ? "\n\nAfwijking:\n"+c.deviation.replace(/<[^>]+>/g,"") : "");
+      + (c.deviation ? "\n\nAfwijking:\n"+c.deviation.replace(/<[^>]+>/g,"") : "")
+      + (c.verify_with ? "\n\nVoorstel tot uitsluiting — verifiëren met: "+c.verify_with : "");
     if(why.trim()) tr.querySelector("td.f-title").dataset.tip = why.trim();  // hover bevinding = waarom
   }catch(e){ /* hover-context is best-effort */ }
 }
@@ -176,7 +183,6 @@ async function post(id,body){
 async function refreshGate(){
   const s = await j("/triage/status");
   const step = document.getElementById("memo-step");
-  document.getElementById("btn-edit").disabled = !s.complete;
   document.getElementById("btn-preview").disabled = !s.complete;
   document.getElementById("btn-export").disabled = !s.complete;
   step.classList.toggle("gated", !s.complete);
@@ -191,7 +197,7 @@ async function setSev(id,sev,btn){
 async function setTriage(id,t){ await post(id,{triage_status:t,reason:reasonFor(id)}); }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 async function loadEditor(){
-  const fs = (await j("/findings?severity=NC")).filter(f=>f.triage_status==="valide");
+  const fs = await j("/findings?severity=NC");  // alle kop-NC's bewerkbaar tijdens triage
   let html = "";
   for(const f of fs){
     const d = await j("/findings/"+f.id);
@@ -213,6 +219,14 @@ async function saveEdit(id){
     corrective_measure:document.getElementById("cm-"+id).value, reason:"redactie in UI" };
   await fetch("/findings/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   document.getElementById("es-"+id).textContent="✓ opgeslagen";
+}
+async function loadConclusion(){
+  const c = await j("/conclusion");
+  const t = c.tally;
+  const el = document.getElementById("conclusion-out"); el.hidden = false;
+  el.textContent =
+    `Valide NC's: ${t.valide} · uitgesloten: ${t.niet_valide} · follow-up: ${t.follow_up} · open: ${t.open}\n\n`+
+    (c.saturated ? "✅ " : "⚠️ ") + c.advice;
 }
 async function preview(){
   document.getElementById("memo-frame").innerHTML = `<iframe src="/memo/preview"></iframe>`;

@@ -149,6 +149,11 @@ def create_app(session: AuditSession) -> FastAPI:
         """Voortgang van de triage; de memo is gated tot dit compleet is."""
         return session.triage_summary()
 
+    @app.get("/conclusion")
+    def conclusion() -> dict[str, object]:
+        """Saturatie-conclusie na triage: telling valide/niet-valide/follow-up + advies."""
+        return session.conclusion()
+
     def _eis_triage_compleet() -> None:
         s = session.triage_summary()
         if not s["complete"]:

@@ -259,6 +259,28 @@ class AuditSession:
             "citations": citations,
             "reasoning": doel.reasoning,
             "deviation": doel.deviation or doel.description,
+            "verify_with": doel.verify_with or "",
+        }
+
+    def conclusion(self) -> dict[str, object]:
+        """Saturatie-conclusie na triage: telling + advies (auditor beslist)."""
+        nc = [f for f in self.findings() if f.severity == "NC"]
+        tally = {
+            s: sum(1 for f in nc if f.triage_status == s)
+            for s in ("open", "valide", "niet_valide", "follow_up")
+        }
+        open_n, follow = tally["open"], tally["follow_up"]
+        if open_n:
+            advies = f"{open_n} kandidaat-NC('s) nog niet beoordeeld."
+        elif follow:
+            advies = f"{follow} follow-up('s) open — meer audits nodig voor saturatie."
+        else:
+            advies = "Voldoende saturatie — de MT-memo kan opgesteld worden."
+        return {
+            "tally": tally,
+            "all_triaged": open_n == 0,
+            "saturated": open_n == 0 and follow == 0,
+            "advice": advies,
         }
 
     def triage_summary(self) -> dict[str, object]:

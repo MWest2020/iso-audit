@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 from iso_audit.memo.draft import draft_findings
 from iso_audit.memo.models import Finding
-from iso_audit.memo.norm_lookup import laad_norm_db
+from iso_audit.memo.norm_lookup import NormDatabase, laad_norm_db
 
 _NORM_SLUG = {"9001": "iso-9001-2015", "27001": "iso-27001-2022"}
 _SEV = {"NC": "NC", "OFI": "OFI", "positief": "POSITIVE"}
@@ -30,7 +30,7 @@ class _ProgressHandler(logging.Handler):
         self._sink(record.getMessage())
 
 
-def _resolve_standard(row_norm: str, clause: str, db: object | None) -> str:
+def _resolve_standard(row_norm: str, clause: str, db: NormDatabase | None) -> str:
     """Bepaal de norm-DB-slug per finding. Bij norm='beide' via clausule-membership.
 
     Clausule-ID's botsen tussen 9001 en 27001 (bv. §6.2); de DB slaat 'beide' op
@@ -39,8 +39,10 @@ def _resolve_standard(row_norm: str, clause: str, db: object | None) -> str:
     """
     if row_norm in _NORM_SLUG:
         return _NORM_SLUG[row_norm]
-    if db is not None and db.has_clause("iso-27001-2022", clause) and not db.has_clause(  # type: ignore[attr-defined]
-        "iso-9001-2015", clause
+    if (
+        db is not None
+        and db.has_clause("iso-27001-2022", clause)
+        and not db.has_clause("iso-9001-2015", clause)
     ):
         return "iso-27001-2022"
     return "iso-9001-2015"

@@ -20,5 +20,8 @@ Lever JSON met exact deze sleutels:
 - "corrective_measure": de vereiste corrigerende maatregel in dwingende taal
   ("de organisatie moet …"). Concreet en toetsbaar. Dit is een NC, dus
   tekortkoming-taal is hier toegestaan (dit is geen aanbeveling).
+- "verify_with": één korte rol-/functie-aanduiding met wie de auditor dit zou
+  verifiëren als het bewijs buiten de tool-scope ligt (bv. "kwaliteitsmanager",
+  "HR", "IT-lead", "MT"). Dit voedt een mogelijk voorstel tot uitsluiting.
 
 Geef alleen de JSON, geen toelichting eromheen.

@@ -86,11 +86,13 @@ def build_memo(
     detector = DefaultPatternDetector()
     lang = language or profile.defaults.language
 
-    # Niet_valide kandidaten zijn door de auditor afgewezen → geen NC in de memo.
+    # Alleen door de auditor bevestigde (valide) NC's in de memo; niet_valide
+    # (false positive) en follow_up (afspraak nodig, voorstel tot uitsluiting)
+    # vallen eruit. De memo is gated op 'geen open kandidaten' (zie API).
     nc_blocks = [
         _nc_block(f, findings, norm_db, detector, lang)
         for f in classifier.ncs(findings)
-        if f.triage_status != "niet_valide"
+        if f.triage_status == "valide"
     ]
     improvements = [
         _improvement_block(f, norm_db, lang) for f in classifier.improvements(findings, threshold)
