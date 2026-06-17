@@ -170,6 +170,19 @@ def create_app(session: AuditSession) -> FastAPI:
                 detail=f"Triage niet compleet: {s['open']} kandidaat-NC('s) nog open.",
             )
 
+    @app.get("/memo/input")
+    def memo_input_get() -> dict[str, object]:
+        """De bewerkbare memo-koptekst + context (voor de pre-generatie editor)."""
+        return session.memo_input_data()
+
+    @app.post("/memo/input")
+    def memo_input_post(data: dict[str, object]) -> dict[str, object]:
+        """Sla de aangepaste memo-input op (auditor past de memo aan vóór generatie)."""
+        try:
+            return session.update_memo_input(data)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/memo/preview", response_class=HTMLResponse)
     def memo_preview() -> str:
         _eis_triage_compleet()

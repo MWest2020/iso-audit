@@ -103,6 +103,40 @@ def test_conclusion_ofi_themes(tmp_path: Path) -> None:
     assert {t["thema"] for t in themes} == {"Documentbeheer", "Monitoring en meting"}  # NC niet
 
 
+def _client_writable_memo(tmp_path: Path) -> TestClient:
+    """Sessie met een schrijfbare kopie van memo-input (mag de repo niet muteren)."""
+    import shutil
+
+    (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
+    mi = tmp_path / "memo-input.yaml"
+    shutil.copy(_EX / "memo-input.yaml", mi)
+    session = AuditSession(
+        tmp_path,
+        profile=str(_EX / "conduction.profile.yaml"),
+        norms_dir="examples/norms",
+        memo_input_path=str(mi),
+    )
+    return TestClient(create_app(session))
+
+
+def test_memo_input_edit_roundtrip(tmp_path: Path) -> None:
+    """Auditor past de memo aan vóór generatie: wijziging persisteert."""
+    client = _client_writable_memo(tmp_path)
+    data = client.get("/memo/input").json()
+    data["title"] = "Aangepaste titel"
+    data["context"]["sources"] = ["Google Drive", "Jira"]
+    assert client.post("/memo/input", json=data).status_code == 200
+    opnieuw = client.get("/memo/input").json()
+    assert opnieuw["title"] == "Aangepaste titel"
+    assert opnieuw["context"]["sources"] == ["Google Drive", "Jira"]
+
+
+def test_memo_input_invalid_400(tmp_path: Path) -> None:
+    """Ongeldige memo-input (mist verplichte velden) faalt met 400, niet bij render."""
+    client = _client_writable_memo(tmp_path)
+    assert client.post("/memo/input", json={"title": "alleen titel"}).status_code == 400
+
+
 def test_get_findings(tmp_path: Path) -> None:
     r = _client(tmp_path).get("/findings")
     assert r.status_code == 200

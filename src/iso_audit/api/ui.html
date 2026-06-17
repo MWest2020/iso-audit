@@ -88,13 +88,9 @@
     <button class="flt sev-POSITIVE" data-sev="POSITIVE" onclick="loadFindings('POSITIVE')">POSITIVE</button>
   </div>
   <div id="bulk-bar">
-    <span class="note">Bulk op selectie:</span>
-    <label>classificatie
-      <select id="bulk-sev"><option value="">—</option>
-        <option>NC</option><option>OFI</option><option>POSITIVE</option></select></label>
-    <label>triage
-      <select id="bulk-triage"><option value="">—</option>
-        <option>open</option><option>valide</option><option>niet_valide</option><option>follow_up</option></select></label>
+    <span class="note">Bulk op selectie — triage</span>
+    <select id="bulk-triage"><option value="">—</option>
+      <option>open</option><option>valide</option><option>niet_valide</option><option>follow_up</option></select>
     <input id="bulk-reason" class="reason" style="width:14rem" placeholder="reden (auditsessie)">
     <button onclick="bulkApply()">Toepassen op selectie</button>
     <span id="bulk-msg" class="ok"></span>
@@ -113,6 +109,8 @@
 <div class="step" id="memo-step">
   <h2><span class="num">5</span>Management-memo</h2>
   <p id="gate-msg" class="note"></p>
+  <button id="btn-memo-edit" class="alt" onclick="loadMemoEditor()">Memo aanpassen vóór generatie</button>
+  <div id="memo-editor"></div>
   <button id="btn-preview" onclick="preview()">Genereer preview</button>
   <button id="btn-export" class="alt" onclick="exportPdf()">Exporteer PDF</button>
   <span id="memo-msg" class="ok"></span>
@@ -274,13 +272,12 @@ function toggleAll(master){
 }
 async function bulkApply(){
   const ids = [...document.querySelectorAll("#triage-wrap .sel:checked")].map(c=>c.value);
-  const sev = document.getElementById("bulk-sev").value;
   const tri = document.getElementById("bulk-triage").value;
   const reason = document.getElementById("bulk-reason").value || "auditsessie (bulk)";
   const msg = document.getElementById("bulk-msg");
   if(!ids.length){ msg.textContent = "⚠ niets geselecteerd"; return; }
-  if(!sev && !tri){ msg.textContent = "⚠ kies classificatie of triage"; return; }
-  const body = {reason}; if(sev) body.severity = sev; if(tri) body.triage_status = tri;
+  if(!tri){ msg.textContent = "⚠ kies een triage-status"; return; }
+  const body = {reason, triage_status: tri};
   msg.textContent = "bezig…";
   for(const id of ids){  // append-only: elke wijziging apart gelogd
     await fetch(`/findings/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -290,9 +287,13 @@ async function bulkApply(){
   await loadFindings(_activeFilter);  // herlaad: severity/triage-wijzigingen zichtbaar maken
 }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+let _editorIds = [];
 async function loadEditor(){
   const fs = await j("/findings?severity=NC");  // alle kop-NC's bewerkbaar tijdens triage
-  let html = "";
+  _editorIds = fs.map(f=>f.id);
+  let html = fs.length
+    ? `<div style="margin:.4rem 0"><button onclick="saveAllEdits()">Alles opslaan (${fs.length})</button> <span id="es-all" class="ok"></span></div>`
+    : "";
   for(const f of fs){
     const d = await j("/findings/"+f.id);
     html += `<div style="border:1px solid var(--border);border-radius:6px;padding:.6rem;margin:.5rem 0">
@@ -312,7 +313,12 @@ async function saveEdit(id){
     deviation:document.getElementById("dev-"+id).value,
     corrective_measure:document.getElementById("cm-"+id).value, reason:"redactie in UI" };
   await fetch("/findings/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  document.getElementById("es-"+id).textContent="✓ opgeslagen";
+  const s=document.getElementById("es-"+id); if(s) s.textContent="✓ opgeslagen";
+}
+async function saveAllEdits(){
+  const all=document.getElementById("es-all"); all.textContent="bezig…";
+  for(const id of _editorIds){ await saveEdit(id); }
+  all.textContent=`✓ ${_editorIds.length} opgeslagen`;
 }
 async function loadConclusion(){
   const c = await j("/conclusion");
@@ -328,6 +334,37 @@ async function loadConclusion(){
     (themes ? `<div class="det-ideal"><strong>Verbeter-thema's (OFI) — grootste hefboom eerst:</strong>`+
               `<ul class="det-bron-list">${themes}</ul>`+
               `<span class="note">Eén thema breed aanpakken tilt meerdere clausules tegelijk op.</span></div>` : "");
+}
+function val(id){ const e=document.getElementById(id); return e ? e.value : ""; }
+async function loadMemoEditor(){
+  const m = await j("/memo/input");
+  const ctx = m.context || {};
+  const scopeLines = Object.entries(ctx.scope||{}).map(([k,v])=>`${k}: ${v}`).join("\n");
+  document.getElementById("memo-editor").innerHTML = `
+    <div style="border:1px solid var(--border);border-radius:6px;padding:.6rem;margin:.5rem 0">
+      <label class="note">Titel</label><input id="m-title" style="width:100%" value="${esc(m.title||"")}">
+      <label class="note">Samenvatting (lead)</label><textarea id="m-lead" rows="3" style="width:100%">${esc(m.lead_summary||"")}</textarea>
+      <label class="note">Auditcyclus</label><input id="m-cycle" style="width:100%" value="${esc(ctx.audit_cycle||"")}">
+      <label class="note">Scope — één per regel: "Norm: hoofdstukken"</label><textarea id="m-scope" rows="3" style="width:100%">${esc(scopeLines)}</textarea>
+      <label class="note">Geraadpleegde bronnen (komma-gescheiden)</label><input id="m-sources" style="width:100%" value="${esc((ctx.sources||[]).join(", "))}">
+      <label class="note">Voorbehoud scope</label><textarea id="m-caveat" rows="2" style="width:100%">${esc(ctx.scope_caveat||"")}</textarea>
+      <label class="note">Bespreking (datum + met wie)</label><input id="m-disc" style="width:100%" value="${esc(ctx.discussion||"")}">
+      <button onclick="saveMemoInput()">Memo opslaan</button> <span id="m-msg" class="ok"></span>
+    </div>`;
+}
+async function saveMemoInput(){
+  const m = await j("/memo/input");            // basis: behoudt date/version/detail_report_ref + dataset_counts
+  const ctx = m.context || {};
+  m.title = val("m-title"); m.lead_summary = val("m-lead");
+  ctx.audit_cycle = val("m-cycle");
+  ctx.scope = {};
+  val("m-scope").split("\n").forEach(line=>{ const i=line.indexOf(":"); if(i>0) ctx.scope[line.slice(0,i).trim()] = line.slice(i+1).trim(); });
+  ctx.sources = val("m-sources").split(",").map(s=>s.trim()).filter(Boolean);
+  ctx.scope_caveat = val("m-caveat");
+  ctx.discussion = val("m-disc") || null;
+  m.context = ctx;
+  const r = await fetch("/memo/input",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(m)});
+  document.getElementById("m-msg").textContent = r.ok ? "✓ opgeslagen" : "⚠ fout (controleer velden)";
 }
 async function preview(){
   document.getElementById("memo-frame").innerHTML = `<iframe src="/memo/preview"></iframe>`;

@@ -6,6 +6,24 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-17 — memo-editor + memo-context uit run; bulk-verfijning
+
+- **Memo aanpasbaar vóór generatie**: `GET`/`POST /memo/input` +
+  `AuditSession.memo_input_data()`/`update_memo_input()` (validatie via
+  `MemoInput` → 400 bij ongeldige input, niet pas bij render). UI-stap 5 krijgt
+  een "Memo aanpassen"-formulier (titel, lead, auditcyclus, scope, bronnen,
+  voorbehoud, bespreking) dat opslaat vóór preview/export.
+- **Memo-context volgt de run**: na een live run zet `_update_memo_context` de
+  **scope** (alle gedraaide normen — 9001 én 27001 bij een beide-run — met het
+  hoofdstuk-bereik) en de **geraadpleegde bronnen** = de *geselecteerde* bronnen
+  (Google Drive / Jira / Miro), niet langer de DB/dataset. Eerder toonde de memo
+  alleen 9001 + `output/audit.db`.
+- **Bulk-triage vereenvoudigd**: classificatie-keuze weg uit de bulk-balk (je
+  filtert al op severity); bulk zet nu alleen de triage-status op de selectie.
+- **Bulk-opslaan in de kop-NC-editor**: "Alles opslaan"-knop slaat alle
+  bewerkte kop-NC's in één keer op.
+- **Tests**: memo-input round-trip + validatie-fail. Gate clean.
+
 ### Added — 2026-06-17 — triage: NC-voorbeelden, OFI-thematisering, bulk-wijziging
 
 Drie auditor-hulpmiddelen op de triage-flow:

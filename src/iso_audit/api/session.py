@@ -29,6 +29,11 @@ class SessionError(ValueError):
     """Sessie kon niet geladen worden of een actie is ongeldig."""
 
 
+# Leesbare namen voor de memo-context (scope + geraadpleegde bronnen).
+_NORM_NAAM = {"9001": "ISO 9001:2015", "27001": "ISO 27001:2022"}
+_BRON_NAAM = {"drive": "Google Drive", "jira": "Jira", "miro": "Miro", "planning": "Planning"}
+
+
 def _miro_health() -> dict[str, object]:
     """Pseudo-source Miro: gekoppeld zodra het API-token gezet is (READ-only)."""
     import os
@@ -255,6 +260,7 @@ class AuditSession:
                 norm=norm, norms_dir=str(self._norms_dir), language="nl", top_n=top_n
             )
             self._save(drafted)
+            self._update_memo_context(norm, sources, chapter)
             self._run.done = self._run.total
             self._run.status = "done"
         except Exception as exc:  # surface elke pipeline-fout in de UI
@@ -388,3 +394,40 @@ class AuditSession:
         pad = Path(output)
         MemoRendererImpl().render_pdf(self.render_html(), pad)
         return pad
+
+    # --- memo-input (bewerkbaar vóór generatie) ------------------------------
+
+    def memo_input_data(self) -> dict[str, object]:
+        """De bewerkbare memo-koptekst + context (voor de pre-generatie editor)."""
+        data: dict[str, object] = yaml.safe_load(self._memo_input_path.read_text("utf-8")) or {}
+        return data
+
+    def update_memo_input(self, data: dict[str, object]) -> dict[str, object]:
+        """Valideer + schrijf de memo-input — auditor past de memo aan vóór generatie.
+
+        Validatie via het MemoInput-model; een ongeldige structuur faalt hier
+        (→ 400 in de API) i.p.v. pas bij de render.
+        """
+        mi = MemoInput.model_validate(data)
+        self._memo_input_path.write_text(
+            yaml.safe_dump(mi.model_dump(), allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        return mi.model_dump()
+
+    def _update_memo_context(self, norm: str, sources: list[str], chapter: str | None) -> None:
+        """Na een live run: scope (norm + hoofdstuk) en geraadpleegde bronnen in
+        de memo-context zetten — de geselecteerde bronnen (Drive/Jira/…), niet de
+        DB/dataset. De auditor kan dit daarna nog aanpassen via de memo-editor.
+        """
+        data = self.memo_input_data()
+        ctx = data.setdefault("context", {})
+        if not isinstance(ctx, dict):
+            return
+        norms = ["9001", "27001"] if norm == "beide" else [norm]
+        bereik = f"§{chapter}" if chapter else "§4 t/m §10"
+        ctx["scope"] = {_NORM_NAAM.get(n, n): bereik for n in norms}
+        ctx["sources"] = [_BRON_NAAM.get(s, s) for s in (sources or ["drive"])]
+        self._memo_input_path.write_text(
+            yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+        )
