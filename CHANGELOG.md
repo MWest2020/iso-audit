@@ -6,6 +6,14 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-06-17 — Jira: migratie naar enhanced search (`/search/jql`)
+
+Atlassian heeft `/rest/api/3/search` verwijderd (HTTP 410). `JiraSource`
+gebruikte dat endpoint nog → een echte Jira-ingest zou falen. Gemigreerd naar
+de enhanced search `/rest/api/3/search/jql`: token-paginatie via
+`nextPageToken` (i.p.v. `startAt`), stoppen op `isLast` (geen `total` meer).
+Geverifieerd tegen de live ISO-scope. Pagination-test bijgewerkt.
+
 ### Added — 2026-06-17 — connector-engine: run_audit leest élke geselecteerde bron in
 
 De kern van de connectoren-fase. Tot nu had `run_audit` de ingest hardcoded op

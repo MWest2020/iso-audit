@@ -11,8 +11,9 @@ basic auth (Atlassian's standaard voor Cloud-token-auth). JQL-config via
 (komma-gescheiden, bv. "ISO"): wordt als `project in (…)` AND-prefix op elke
 query gezet zodat een run binnen de ISO-scope blijft.
 
-Pagination: Jira Cloud's `/search` endpoint geeft maximaal `maxResults=100`
-per call; deze adapter paginate via `startAt` tot uitputting.
+Pagination: via Jira Cloud's enhanced search `/rest/api/3/search/jql`
+(de oude `/search` is verwijderd, HTTP 410). Token-gebaseerd: paginate via
+`nextPageToken` tot `isLast`.
 """
 
 from __future__ import annotations
@@ -148,27 +149,31 @@ class JiraSource:
             }
 
     def _iterate_issues(self, jql: str) -> Iterator[dict[str, Any]]:
-        """Paginated iterator over Jira search-API."""
+        """Paginated iterator over Jira's enhanced search-API (`/search/jql`).
+
+        De oude `/rest/api/3/search` is door Atlassian verwijderd (HTTP 410).
+        De enhanced search pagineert via een opaque `nextPageToken` i.p.v.
+        `startAt` en geeft geen `total` meer terug; we stoppen bij `isLast`,
+        een ontbrekende token of een lege pagina.
+        """
         if not self._base_url:
             return
-        url = f"{self._base_url}/rest/api/3/search"
-        start_at = 0
+        url = f"{self._base_url}/rest/api/3/search/jql"
+        next_token: str | None = None
         while True:
-            resp = self._http_get(
-                url,
-                params={
-                    "jql": jql,
-                    "startAt": start_at,
-                    "maxResults": self._page_size,
-                    "fields": "summary,status,labels,updated,description",
-                },
-            )
+            params: dict[str, object] = {
+                "jql": jql,
+                "maxResults": self._page_size,
+                "fields": "summary,status,labels,updated,description",
+            }
+            if next_token:
+                params["nextPageToken"] = next_token
+            resp = self._http_get(url, params=params)
             data = resp.json()
             issues: list[dict[str, Any]] = data.get("issues", [])
             yield from issues
-            total = int(data.get("total", 0))
-            start_at += len(issues)
-            if not issues or start_at >= total:
+            next_token = data.get("nextPageToken")
+            if data.get("isLast") or not next_token or not issues:
                 break
 
     def _http_get(self, url: str, params: dict[str, object] | None = None) -> requests.Response:

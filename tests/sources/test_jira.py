@@ -100,11 +100,12 @@ def test_list_documents_pagineert(monkeypatch: pytest.MonkeyPatch) -> None:
     from iso_audit.sources.jira import JiraSource
 
     src = JiraSource(base_url="https://x", email="e@b", api_token="t", page_size=2)
+    # Enhanced search: token-pagination via nextPageToken; laatste pagina isLast.
     page1 = {
         "issues": [_issue("AUD-1", "Eerste"), _issue("AUD-2", "Tweede")],
-        "total": 3,
+        "nextPageToken": "tok2",
     }
-    page2 = {"issues": [_issue("AUD-3", "Derde")], "total": 3}
+    page2 = {"issues": [_issue("AUD-3", "Derde")], "isLast": True}
     with patch(
         "iso_audit.sources.jira.requests.get",
         side_effect=[_fake_response(data=page1), _fake_response(data=page2)],
@@ -112,6 +113,8 @@ def test_list_documents_pagineert(monkeypatch: pytest.MonkeyPatch) -> None:
         docs = list(src.list_documents())
     assert [d.id for d in docs] == ["AUD-1", "AUD-2", "AUD-3"]
     assert mock_get.call_count == 2
+    # Tweede call moet de paginatie-token meesturen.
+    assert mock_get.call_args.kwargs["params"]["nextPageToken"] == "tok2"
 
 
 def test_list_documents_geeft_document_velden(
