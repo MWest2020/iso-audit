@@ -235,7 +235,18 @@ async function loadDetail(id){
     const vbBlok = vb
       ? `<div class="det-ideal"><strong>Hoe de tool het had willen zien:</strong><ul class="det-bron-list">${vb}</ul></div>`
       : "";
-    det.querySelector("td").innerHTML = bronBlok + vbBlok;
+    // Redigeerbaar veld: NC → vereiste corrigerende maatregel; OFI → aanbeveling.
+    let editBlok = "";
+    if(c.severity === "NC"){
+      editBlok = `<div class="det-ideal"><label class="note">Vereiste corrigerende maatregel</label>`
+        + `<textarea id="cm-det-${id}" rows="2" style="width:100%">${esc(c.corrective_measure||"")}</textarea>`
+        + `<button onclick="saveField('${id}','corrective_measure','cm-det-${id}')">Opslaan</button> <span id="fs-${id}" class="ok"></span></div>`;
+    } else if(c.severity === "OFI"){
+      editBlok = `<div class="det-ideal"><label class="note">Aanbeveling</label>`
+        + `<textarea id="sg-det-${id}" rows="2" style="width:100%">${esc(c.suggestion||"")}</textarea>`
+        + `<button onclick="saveField('${id}','suggestion','sg-det-${id}')">Opslaan</button> <span id="fs-${id}" class="ok"></span></div>`;
+    }
+    det.querySelector("td").innerHTML = bronBlok + vbBlok + editBlok;
     det.dataset.loaded = "1";
   }catch(e){ det.querySelector("td").innerHTML = `<span class="note">Context laden mislukt.</span>`; }
 }
@@ -319,6 +330,11 @@ async function saveAllEdits(){
   const all=document.getElementById("es-all"); all.textContent="bezig…";
   for(const id of _editorIds){ await saveEdit(id); }
   all.textContent=`✓ ${_editorIds.length} opgeslagen`;
+}
+async function saveField(id, field, elId){
+  const body = {reason:"redactie in UI"}; body[field] = document.getElementById(elId).value;
+  await fetch("/findings/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const s=document.getElementById("fs-"+id); if(s) s.textContent="✓ opgeslagen";
 }
 async function loadConclusion(){
   const c = await j("/conclusion");

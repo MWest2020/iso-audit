@@ -6,6 +6,19 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-17 — brondocument-links in de memo + redigeerbare maatregel/aanbeveling
+
+- **Brondocument-links in de gerenderde memo**: `NCBlock` + `ImprovementBlock`
+  krijgen `bronnen` (uit `Finding.bronnen`); de NC- en verbeterpunt-partials
+  tonen een "Brondocumenten"-lijst met klikbare links (Drive/Jira/Miro) + per
+  bron de beschrijving. Vervangt de losse reasoning-lijst (was redundant).
+- **OFI-aanbeveling redigeerbaar**: `suggestion` toegevoegd aan `TriageUpdate`
+  + `apply_triage` (append-only gelogd). In de triage-uitklap is nu per
+  bevinding het juiste veld te bewerken — **NC → vereiste corrigerende
+  maatregel**, **OFI → aanbeveling** — met een Opslaan-knop (lazy, per finding,
+  geen zware mass-load).
+- **Tests**: OFI-aanbeveling round-trip + memo-brondocument-links. Gate clean.
+
 ### Added — 2026-06-17 — memo-editor + memo-context uit run; bulk-verfijning
 
 - **Memo aanpasbaar vóór generatie**: `GET`/`POST /memo/input` +

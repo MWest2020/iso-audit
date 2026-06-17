@@ -16,7 +16,14 @@
 
 <h4>Waar de praktijk afwijkt</h4>
 <div>{{ nc.deviation | safe }}</div>
-{% if nc.reasoning %}
+{% if nc.bronnen %}
+<p class="reasoning"><em>Brondocumenten:</em></p>
+<ul class="reasoning">
+{% for b in nc.bronnen %}
+<li>[{{ b.herkomst }}] {% if b.url %}<a href="{{ b.url }}">{{ b.doc_naam or b.doc_id or b.herkomst }}</a>{% else %}{{ b.doc_naam or b.doc_id }}{% endif %}{% if b.beschrijving %} — {{ b.beschrijving }}{% endif %}</li>
+{% endfor %}
+</ul>
+{% elif nc.reasoning %}
 <p class="reasoning"><em>Waarop gebaseerd (wat de tool aantrof):</em></p>
 <ul class="reasoning">
 {% for r in nc.reasoning %}<li>{{ r }}</li>{% endfor %}

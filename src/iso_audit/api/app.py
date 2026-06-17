@@ -24,7 +24,8 @@ class TriageUpdate(BaseModel):
     triage_status: TriageStatus | None = None
     title: str | None = None
     deviation: str | None = None
-    corrective_measure: str | None = None
+    corrective_measure: str | None = None  # NC: vereiste maatregel
+    suggestion: str | None = None  # OFI: aanbeveling
     reason: str = ""
 
 
@@ -84,6 +85,7 @@ def create_app(session: AuditSession) -> FastAPI:
                 title=update.title,
                 deviation=update.deviation,
                 corrective_measure=update.corrective_measure,
+                suggestion=update.suggestion,
                 reason=update.reason,
             )
         except SessionError as exc:

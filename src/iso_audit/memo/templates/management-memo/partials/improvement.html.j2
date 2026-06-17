@@ -9,6 +9,14 @@
 
 <h4>Waar de praktijk afwijkt</h4>
 <div>{{ imp.deviation | safe }}</div>
+{% if imp.bronnen %}
+<p class="reasoning"><em>Brondocumenten:</em></p>
+<ul class="reasoning">
+{% for b in imp.bronnen %}
+<li>[{{ b.herkomst }}] {% if b.url %}<a href="{{ b.url }}">{{ b.doc_naam or b.doc_id or b.herkomst }}</a>{% else %}{{ b.doc_naam or b.doc_id }}{% endif %}{% if b.beschrijving %} — {{ b.beschrijving }}{% endif %}</li>
+{% endfor %}
+</ul>
+{% endif %}
 
 <h4>Waarom verbeterpunt en geen NC?</h4>
 <div>{{ imp.classification_rationale | safe }}</div>

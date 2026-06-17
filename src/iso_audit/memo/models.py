@@ -117,6 +117,7 @@ class NCBlock(BaseModel):
     pattern_note: str | None = None  # cross-clause patroon (auto)
     corrective_measure: str  # dwingende taal, geen "aanbeveling"
     actions: list[ActionRow] = Field(default_factory=list)
+    bronnen: list[BronRef] = Field(default_factory=list)  # brondocumenten met links
     # Triage-checklist (auditor-spiegel): redenatie + status. Bij `valide` toont
     # de render geen checklist (bevestigde NC); anders wel.
     reasoning: list[str] = Field(default_factory=list)
@@ -131,6 +132,7 @@ class ImprovementBlock(BaseModel):
     deviation: str
     classification_rationale: str  # "waarom verbeterpunt en geen NC?"
     suggestion: str | None = None
+    bronnen: list[BronRef] = Field(default_factory=list)  # brondocumenten met links
 
 
 class MemoContext(BaseModel):

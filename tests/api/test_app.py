@@ -137,6 +137,43 @@ def test_memo_input_invalid_400(tmp_path: Path) -> None:
     assert client.post("/memo/input", json={"title": "alleen titel"}).status_code == 400
 
 
+def test_edit_aanbeveling_ofi(tmp_path: Path) -> None:
+    """OFI-aanbeveling (suggestion) is redigeerbaar via triage; append-only gelogd."""
+    client = _client(tmp_path)
+    r = client.post(
+        "/findings/f2", json={"suggestion": "Overweeg X vast te leggen", "reason": "redactie"}
+    )
+    assert r.status_code == 200
+    assert client.get("/findings/f2").json()["suggestion"] == "Overweeg X vast te leggen"
+    assert client.get("/findings/f2/context").json()["suggestion"] == "Overweeg X vast te leggen"
+
+
+def test_memo_toont_brondocument_links(tmp_path: Path) -> None:
+    """De gerenderde memo bevat klikbare links naar de brondocumenten."""
+    findings: list[dict[str, object]] = [
+        {
+            "id": "f1",
+            "severity": "NC",
+            "standard": "iso-27001-2022",
+            "clause": "6.5",
+            "title": "x",
+            "description": "d",
+            "triage_status": "valide",
+            "bronnen": [
+                {
+                    "herkomst": "Jira",
+                    "doc_id": "ISO-7",
+                    "doc_naam": "ISO-7",
+                    "url": "https://co.atlassian.net/browse/ISO-7",
+                    "beschrijving": "ticket",
+                }
+            ],
+        }
+    ]
+    html = _client_met(tmp_path, findings).get("/memo/preview").text
+    assert "https://co.atlassian.net/browse/ISO-7" in html
+
+
 def test_get_findings(tmp_path: Path) -> None:
     r = _client(tmp_path).get("/findings")
     assert r.status_code == 200

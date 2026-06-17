@@ -46,6 +46,7 @@ def _nc_block(
         pattern_note=detector.pattern_note(f.clause, findings),
         corrective_measure=f.corrective_measure or "(corrigerende maatregel in te vullen)",
         actions=f.actions or [ActionRow(wat="(actie in te vullen)")],
+        bronnen=f.bronnen,
         reasoning=f.reasoning,
         triage_status=f.triage_status,
     )
@@ -60,6 +61,7 @@ def _improvement_block(f: Finding, norm_db: NormDatabase, language: str) -> Impr
             f.classification_rationale or "(classificatie-rationale in te vullen)"
         ),
         suggestion=f.suggestion,
+        bronnen=f.bronnen,
     )
 
 

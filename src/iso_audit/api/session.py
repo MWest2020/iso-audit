@@ -129,6 +129,7 @@ class AuditSession:
         title: str | None = None,
         deviation: str | None = None,
         corrective_measure: str | None = None,
+        suggestion: str | None = None,
         reason: str,
         actor: str = "auditor",
         now: datetime | None = None,
@@ -154,6 +155,7 @@ class AuditSession:
         _maybe("title", title)
         _maybe("deviation", deviation)
         _maybe("corrective_measure", corrective_measure)
+        _maybe("suggestion", suggestion)
         if not wijzigingen:
             return doel
         self._save(findings)
@@ -317,6 +319,10 @@ class AuditSession:
             "bronnen": [b.model_dump() for b in doel.bronnen],
             "thema": doel.thema or "",
             "examples": doel.examples,
+            # Redigeerbaar in de triage-uitklap: NC → maatregel, OFI → aanbeveling.
+            "severity": doel.severity,
+            "corrective_measure": doel.corrective_measure or "",
+            "suggestion": doel.suggestion or "",
         }
 
     def conclusion(self) -> dict[str, object]:
