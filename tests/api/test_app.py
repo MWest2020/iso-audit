@@ -362,12 +362,18 @@ def test_live_run_worker_draft_en_status(tmp_path: Path, monkeypatch) -> None:  
     ]
     monkeypatch.setattr(rj, "draft_from_db", lambda **kw: fake)
 
+    import shutil
+
     (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
+    # Schrijfbare kopie: _run_live_worker werkt de memo-context bij — mag de
+    # gecommitte repo-memo-input NIET muteren.
+    mi = tmp_path / "memo-input.yaml"
+    shutil.copy(_EX / "memo-input.yaml", mi)
     s = AuditSession(
         tmp_path,
         profile=str(_EX / "conduction.profile.yaml"),
         norms_dir="examples/norms",
-        memo_input_path=str(_EX / "memo-input.yaml"),
+        memo_input_path=str(mi),
     )
     s._run = _RunState(status="running", total=7, mode="live")
     s._run_live_worker("27001", ["drive"], "8", 3)  # synchroon (geen thread)
