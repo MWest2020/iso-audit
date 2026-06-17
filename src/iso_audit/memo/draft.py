@@ -16,7 +16,7 @@ from typing import Any
 
 import anthropic
 
-from iso_audit.memo.models import ActionRow, Finding
+from iso_audit.memo.models import ActionRow, BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase
 
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
@@ -87,9 +87,20 @@ def _draft_cluster(
     )
     data = _parse_json(message.content[0].text)  # type: ignore[union-attr]
     extra = sorted({f.clause for f in cluster} - {clause})
-    bronnen = sorted({f.source for f in cluster if f.source})
+    bron_namen = sorted({f.source for f in cluster if f.source})
     # Redenatie-lijst: wat de tool per bevinding aantrof + de bron — basis voor triage.
     reasoning = [f"[{f.source or 'bron'}] {f.description[:160]}" for f in cluster if f.description]
+    # Structureel: de onderliggende brondocumenten (met links), gededupliceerd
+    # op (herkomst, doc_id) — voer voor de uitklap-weergave in de UI.
+    bron_refs: list[BronRef] = []
+    gezien: set[tuple[str, str]] = set()
+    for f in cluster:
+        for b in f.bronnen:
+            sleutel = (b.herkomst, b.doc_id)
+            if sleutel in gezien:
+                continue
+            gezien.add(sleutel)
+            bron_refs.append(b)
     return Finding(
         id=f"nc-{clause}",
         severity="NC",
@@ -97,12 +108,13 @@ def _draft_cluster(
         clause=clause,
         extra_clauses=extra,
         title=str(data.get("title") or f"NC clausule {clause}"),
-        source=", ".join(bronnen) or None,
+        source=", ".join(bron_namen) or None,
         description=f"Gedistilleerd uit {len(cluster)} ruwe NC-bevindingen op clausule {clause}.",
         deviation=str(data.get("deviation") or ""),
         corrective_measure=str(data.get("corrective_measure") or ""),
         actions=[ActionRow(wat="(actie in te vullen door auditor)")],
         reasoning=reasoning,
+        bronnen=bron_refs,
         triage_status="open",
         verify_with=str(data.get("verify_with") or "") or None,
     )

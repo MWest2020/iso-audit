@@ -29,6 +29,20 @@
   iframe { width:100%; height:520px; border:1px solid var(--border); border-radius:6px; margin-top:.5rem; }
   .ok { color:#1a7d46; font-size:.8rem; }
   .src-off { opacity:.5; }
+  /* Severity-kleuren: NC=rood, OFI=amber, POSITIVE=groen */
+  .sev-NC[aria-pressed="true"] { background:#c0392b; color:#fff; border-color:#c0392b; }
+  .sev-OFI[aria-pressed="true"] { background:#b8860b; color:#fff; border-color:#b8860b; }
+  .sev-POSITIVE[aria-pressed="true"] { background:#1a7d46; color:#fff; border-color:#1a7d46; }
+  tr.sevrow-NC td:first-child { border-left:4px solid #c0392b; }
+  tr.sevrow-OFI td:first-child { border-left:4px solid #b8860b; }
+  tr.sevrow-POSITIVE td:first-child { border-left:4px solid #1a7d46; }
+  #triage-filter { margin:.4rem 0; display:flex; gap:.4rem; align-items:center; }
+  .flt[aria-pressed="true"] { outline:2px solid var(--blue); font-weight:600; }
+  .exp { cursor:pointer; user-select:none; color:var(--blue); font-weight:700; margin-right:.2rem; }
+  tr.detail > td { background:#f6f8fa; font-size:.85rem; padding:.5rem .7rem; }
+  .det-why { white-space:normal; margin-bottom:.5rem; }
+  .det-bron ul { margin:.2rem 0 0 1rem; padding:0; }
+  .det-bron a { color:var(--blue); }
   .badge-on { color:#1a7d46; font-size:.72rem; }
   .badge-off { color:#9a6700; font-size:.72rem; cursor:help; }
   #bar-wrap { background:var(--border); border-radius:6px; height:14px; margin:.5rem 0; overflow:hidden; }
@@ -62,8 +76,13 @@
 
 <div class="step">
   <h2><span class="num">3</span>Triage + bewerken <span class="note">— valide / niet-valide / follow-up; append-only</span></h2>
-  <button onclick="loadFindings('NC')">Laad NC-kandidaten</button>
-  <button class="alt" onclick="loadFindings()">Toon alle findings</button>
+  <div id="triage-filter">
+    <span class="note">Filter:</span>
+    <button class="flt" data-sev="" onclick="loadFindings('')">Alle</button>
+    <button class="flt sev-NC" data-sev="NC" onclick="loadFindings('NC')">NC</button>
+    <button class="flt sev-OFI" data-sev="OFI" onclick="loadFindings('OFI')">OFI</button>
+    <button class="flt sev-POSITIVE" data-sev="POSITIVE" onclick="loadFindings('POSITIVE')">POSITIVE</button>
+  </div>
   <div id="triage-wrap"></div>
   <button id="btn-edit" class="alt" onclick="loadEditor()">Bewerk kop-NC's</button>
   <div id="editor"></div>
@@ -150,22 +169,35 @@ async function startRun(){
     }
   }, live?700:400);
 }
+let _activeFilter = "";
+function escapeHtml(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 async function loadFindings(severity){
-  const fs = await j("/findings" + (severity ? "?severity="+severity : ""));
+  _activeFilter = severity || "";
+  document.querySelectorAll("#triage-filter .flt").forEach(b=>b.setAttribute("aria-pressed", b.dataset.sev===_activeFilter));
+  const fs = await j("/findings" + (_activeFilter ? "?severity="+_activeFilter : ""));
   let rows = fs.map(f => `
-    <tr data-id="${f.id}">
-      <td class="f-title" style="cursor:help">${f.title}</td><td class="f-clause" style="cursor:help">${f.clause}</td>
+    <tr data-id="${f.id}" class="sevrow-${f.severity}">
+      <td class="f-title" style="cursor:help"><span class="exp" onclick="toggleDetail('${f.id}')" title="uitklappen">▸</span> ${escapeHtml(f.title)}</td>
+      <td class="f-clause" style="cursor:help">${f.clause}</td>
       <td>${f.source||"-"}</td>
-      <td>${SEV.map(s=>`<button class="sev" aria-pressed="${f.severity===s}" onclick="setSev('${f.id}','${s}',this)">${s}</button>`).join(" ")}</td>
+      <td>${SEV.map(s=>`<button class="sev sev-${s}" aria-pressed="${f.severity===s}" onclick="setSev('${f.id}','${s}',this)">${s}</button>`).join(" ")}</td>
       <td><select onchange="setTriage('${f.id}',this.value)">
         ${TRIAGE.map(t=>`<option value="${t}" ${f.triage_status===t?"selected":""}>${t}</option>`).join("")}
       </select></td>
       <td><input class="reason" placeholder="reden (auditsessie)"></td>
       <td class="ok"></td>
-    </tr>`).join("");
+    </tr>
+    <tr class="detail" id="det-${f.id}" hidden><td colspan="7"><em>laden…</em></td></tr>`).join("");
   document.getElementById("triage-wrap").innerHTML =
     `<table><thead><tr><th>Bevinding</th><th>Clausule</th><th>Bron</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   for(const f of fs){ enrichTooltip(f.id); }
+}
+function toggleDetail(id){
+  const row = document.getElementById("det-"+id);
+  if(!row) return;
+  row.hidden = !row.hidden;
+  const caret = document.querySelector(`tr[data-id="${id}"] .exp`);
+  if(caret) caret.textContent = row.hidden ? "▸" : "▾";
 }
 async function enrichTooltip(id){
   try{
@@ -178,6 +210,20 @@ async function enrichTooltip(id){
       + (c.deviation ? "\n\nAfwijking:\n"+c.deviation.replace(/<[^>]+>/g,"") : "")
       + (c.verify_with ? "\n\nVoorstel tot uitsluiting — verifiëren met: "+c.verify_with : "");
     if(why.trim()) tr.querySelector("td.f-title").dataset.tip = why.trim();  // hover bevinding = waarom
+    // Uitklap-detail: klikbare links naar de brondocumenten + waarom (per bron).
+    const det = document.getElementById("det-"+id);
+    if(det){
+      const bronnen = (c.bronnen||[]).map(b=>{
+        const label = escapeHtml(b.doc_naam || b.doc_id || b.herkomst || "bron");
+        const link = b.url ? `<a href="${b.url}" target="_blank" rel="noopener">${label}</a>` : label;
+        return `<li><strong>[${escapeHtml(b.herkomst||"bron")}]</strong> ${link}`
+          + (b.beschrijving ? `<br><span class="note">${escapeHtml(b.beschrijving)}</span>` : "") + `</li>`;
+      }).join("");
+      det.querySelector("td").innerHTML =
+        (why.trim() ? `<div class="det-why">${escapeHtml(why).replace(/\n/g,"<br>")}</div>` : "")
+        + (bronnen ? `<div class="det-bron"><strong>Brondocumenten:</strong><ul>${bronnen}</ul></div>`
+                   : `<span class="note">Geen brondocument-links beschikbaar.</span>`);
+    }
   }catch(e){ /* hover-context is best-effort */ }
 }
 function reasonFor(id){

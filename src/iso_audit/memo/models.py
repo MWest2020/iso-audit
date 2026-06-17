@@ -23,6 +23,21 @@ TriageStatus = Literal["open", "valide", "niet_valide", "follow_up"]
 # --- Input-modellen ---------------------------------------------------------
 
 
+class BronRef(BaseModel):
+    """Eén brondocument onder een bevinding — klikbare link + waarom het bijdraagt.
+
+    Maakt de keten ``bevinding → brondocument`` zichtbaar in de UI: de auditor
+    kan een kop-NC uitklappen en doorklikken naar het echte Drive-document /
+    Jira-issue, met per bron de reden waarom het een (kandidaat-)NC-signaal is.
+    """
+
+    herkomst: str = ""  # Drive / Jira / Miro / …
+    doc_id: str = ""
+    doc_naam: str = ""
+    url: str | None = None  # link naar het brondocument (indien af te leiden uit herkomst+id)
+    beschrijving: str = ""  # waarom dit document bijdraagt aan de (kandidaat-)NC
+
+
 class Finding(BaseModel):
     """Eén bevinding uit de findings-dataset (input-contract)."""
 
@@ -46,6 +61,8 @@ class Finding(BaseModel):
     suggestion: str | None = None
     # Triage-checklist: redenatie (wat de tool aantrof) + auditor-status.
     reasoning: list[str] = Field(default_factory=list)
+    # Brondocumenten onder deze bevinding (uitklapbaar in de UI, met links).
+    bronnen: list[BronRef] = Field(default_factory=list)
     triage_status: TriageStatus = "open"
     # Bij follow_up: LLM-suggestie met wie het bewijs te verifiëren (voorstel
     # tot uitsluiting). Auditor maakt de afspraak.

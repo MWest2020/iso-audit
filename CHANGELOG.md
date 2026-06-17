@@ -6,6 +6,25 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-17 — triage-UI: uitklapbare bronlinks + severity-kleuren + filter
+
+Auditor-spiegel-verfijning op de triage-tabel (`api/ui.html` + ondersteunende
+modellen). Drie wensen uit de demo:
+
+- **Uitklapbare bevinding → brondocumenten**: nieuw `BronRef`-model
+  (`herkomst`/`doc_id`/`doc_naam`/`url`/`beschrijving`) + `Finding.bronnen`.
+  `export_db_findings` legt per bevinding de bron vast met een **klikbare URL**
+  (`_bron_url`: Drive → `drive.google.com/open?id=`, Jira → `<base>/browse/<key>`,
+  Miro → board-widget); de kop-NC-draft **bundelt** de bronnen van zijn cluster
+  (gededupliceerd op herkomst+id). Elke rij klapt uit met de links + per bron de
+  reden, plus het "waarom NC-kandidaat". `finding_context` levert `bronnen` mee.
+- **Severity-onderscheid**: niet elke bevinding is een NC. De DB-export-titel
+  had altijd het misleidende prefix "NC clausule …"; nu neutraal "§<clausule> —
+  …". Severity-badges + rij-rand gekleurd (NC=rood, OFI=amber, POSITIVE=groen).
+- **Filter** op severity (Alle / NC / OFI / POSITIVE) boven de triage-tabel.
+- **Tests**: `_bron_url` (per bron + edge-cases), bronnen-aggregatie+dedup in de
+  draft. 752 tests groen; ruff/format/mypy/bandit clean.
+
 ### Fixed — 2026-06-17 — Jira: migratie naar enhanced search (`/search/jql`)
 
 Atlassian heeft `/rest/api/3/search` verwijderd (HTTP 410). `JiraSource`

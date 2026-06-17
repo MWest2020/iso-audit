@@ -76,3 +76,29 @@ def test_draft_findings_mock(tmp_path: Path) -> None:
     assert len(ncs) == 2  # twee kop-NC's gedraft
     assert all(f.corrective_measure == "Doe X." for f in ncs)
     assert any(f.severity == "POSITIVE" for f in out)  # niet-NC behouden
+
+
+def test_draft_aggregeert_bronnen_gededupliceerd(tmp_path: Path) -> None:
+    """Kop-NC bundelt de brondocumenten van zijn cluster, dedup op (herkomst, id)."""
+    from iso_audit.memo.models import BronRef
+
+    db = _norm_db(tmp_path)
+    f1, f2, f3 = _f("1", "NC", "6.5"), _f("2", "NC", "6.5"), _f("3", "NC", "6.5")
+    f1.bronnen = [BronRef(herkomst="Drive", doc_id="d1", doc_naam="Beleid", url="u1")]
+    f2.bronnen = [BronRef(herkomst="Jira", doc_id="ISO-7", doc_naam="ISO-7", url="u2")]
+    f3.bronnen = [BronRef(herkomst="Drive", doc_id="d1", doc_naam="Beleid", url="u1")]  # duplicaat
+
+    block = MagicMock()
+    block.text = '{"title": "Kop-NC", "deviation": "d", "corrective_measure": "X."}'
+    resp = MagicMock()
+    resp.content = [block]
+    fake = MagicMock()
+    fake.messages.create.return_value = resp
+
+    with patch.object(draft_mod.anthropic, "Anthropic", return_value=fake):
+        out = draft_findings([f1, f2, f3], norm_db=db, language="nl", top_n=1)
+
+    nc = next(f for f in out if f.severity == "NC")
+    sleutels = {(b.herkomst, b.doc_id) for b in nc.bronnen}
+    assert sleutels == {("Drive", "d1"), ("Jira", "ISO-7")}  # dup samengevoegd
+    assert len(nc.bronnen) == 2

@@ -12,11 +12,33 @@ import logging
 from collections.abc import Callable
 
 from iso_audit.memo.draft import draft_findings
-from iso_audit.memo.models import Finding
+from iso_audit.memo.models import BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase, laad_norm_db
 
 _NORM_SLUG = {"9001": "iso-9001-2015", "27001": "iso-27001-2022"}
 _SEV = {"NC": "NC", "OFI": "OFI", "positief": "POSITIVE"}
+
+
+def _bron_url(herkomst: str, doc_id: str) -> str | None:
+    """Bouw een klikbare link naar het brondocument o.b.v. herkomst + id.
+
+    Boring & auditable: per bron een expliciete, well-known URL-vorm; onbekende
+    bron of ontbrekend id → geen link (None). Geen geheime mapping-logica.
+    """
+    import os
+
+    if not doc_id:
+        return None
+    h = (herkomst or "").lower()
+    if h == "drive":
+        return f"https://drive.google.com/open?id={doc_id}"
+    if h == "jira":
+        base = os.environ.get("JIRA_BASE_URL", "").rstrip("/")
+        return f"{base}/browse/{doc_id}" if base else None
+    if h == "miro":
+        board = os.environ.get("MIRO_BOARD_ID", "")
+        return f"https://miro.com/app/board/{board}/?moveToWidget={doc_id}" if board else None
+    return None
 
 
 class _ProgressHandler(logging.Handler):
@@ -65,15 +87,28 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
     for r in rows:
         clausule = r["clausule_id"]
         titel = titels.get(clausule, {}).get("titel", clausule)
+        herkomst = r["herkomst"] or ""
+        doc_id = r["doc_id"] or ""
+        beschrijving = r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)"
         findings.append(
             Finding(
                 id=str(r["id"]),
                 severity=_SEV.get(r["classificatie"], "UNCLASSIFIED"),  # type: ignore[arg-type]
                 standard=_resolve_standard(r["norm"], clausule, db),
                 clause=clausule,
-                source=r["herkomst"],  # bevinding berust op bron Y (Drive/Miro/…)
-                title=f"NC clausule {clausule} — {titel} [{(r['document_naam'] or '?')[:50]}]",
-                description=r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)",
+                source=herkomst,  # bevinding berust op bron Y (Drive/Miro/…)
+                # Geen "NC"-prefix: niet elke bevinding is een NC (ook OFI/positief).
+                title=f"§{clausule} — {titel} [{(r['document_naam'] or '?')[:50]}]",
+                description=beschrijving,
+                bronnen=[
+                    BronRef(
+                        herkomst=herkomst,
+                        doc_id=doc_id,
+                        doc_naam=r["document_naam"] or "",
+                        url=_bron_url(herkomst, doc_id),
+                        beschrijving=beschrijving,
+                    )
+                ],
             )
         )
     return findings

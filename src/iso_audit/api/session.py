@@ -308,6 +308,7 @@ class AuditSession:
             "reasoning": doel.reasoning,
             "deviation": doel.deviation or doel.description,
             "verify_with": doel.verify_with or "",
+            "bronnen": [b.model_dump() for b in doel.bronnen],
         }
 
     def conclusion(self) -> dict[str, object]:

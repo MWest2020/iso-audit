@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
-from iso_audit.api.run_job import _resolve_standard
+from iso_audit.api.run_job import _bron_url, _resolve_standard
 from iso_audit.memo.norm_lookup import laad_norm_db
 
 
@@ -51,3 +52,26 @@ def test_has_clause(tmp_path: Path) -> None:
     db = _db(tmp_path)
     assert db.has_clause("iso-27001-2022", "8.16") is True
     assert db.has_clause("iso-9001-2015", "8.16") is False
+
+
+# ---------- _bron_url: klikbare link per bron ----------
+
+
+def test_bron_url_drive() -> None:
+    assert _bron_url("Drive", "abc123") == "https://drive.google.com/open?id=abc123"
+
+
+def test_bron_url_jira(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JIRA_BASE_URL", "https://co.atlassian.net")
+    assert _bron_url("Jira", "ISO-7") == "https://co.atlassian.net/browse/ISO-7"
+
+
+def test_bron_url_jira_zonder_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("JIRA_BASE_URL", raising=False)
+    # Zonder base-url geen betrouwbare link.
+    assert _bron_url("Jira", "ISO-7") is None
+
+
+def test_bron_url_onbekend_of_leeg() -> None:
+    assert _bron_url("planning", "x") is None  # geen well-known vorm
+    assert _bron_url("Drive", "") is None  # geen id → geen link
