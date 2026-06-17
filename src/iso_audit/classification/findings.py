@@ -310,7 +310,7 @@ def _classificeer_doc(
         log_classification(
             conn,
             audit_id=audit_id,
-            finding_id=f"drive:{doc['id']}:{','.join(sorted(clausule_ids))}",
+            finding_id=f"{(doc.get('herkomst') or 'drive').lower()}:{doc['id']}:{','.join(sorted(clausule_ids))}",
             system_prompt=system,
             user_prompt=user,
             model=teller.model,
@@ -401,10 +401,14 @@ def _usage_dict(usage: Any) -> dict[str, Any]:
 
 
 def _gedaan_per_doc(conn: sqlite3.Connection, norm: str) -> dict[str, set[str]]:
-    """`{doc_id: {clausule_id, ...}}` van reeds geclassificeerde Drive-combinaties."""
+    """`{doc_id: {clausule_id, ...}}` van reeds geclassificeerde document-bronnen.
+
+    Alle niet-Miro-bronnen (Drive, Jira, Planning, …) gaan via het document-pad
+    en delen deze dedup; Miro heeft een eigen pad (`_gedaan_miro`).
+    """
     result: dict[str, set[str]] = defaultdict(set)
     rows = conn.execute(
-        "SELECT doc_id, clausule_id FROM bevindingen WHERE herkomst='Drive' AND norm=?",
+        "SELECT doc_id, clausule_id FROM bevindingen WHERE herkomst != 'Miro' AND norm=?",
         (norm,),
     ).fetchall()
     for doc_id, cid in rows:
@@ -714,7 +718,8 @@ def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
         bevs = [
             {
                 "_doc_id": doc_id,
-                "herkomst": "Drive",
+                # Bron van de bevinding (Drive/Jira/Planning/…) — terugvoerbaar.
+                "herkomst": doc.get("herkomst") or "Drive",
                 "clausule": cid,
                 "clausule_titel": ctx.clausules.get(cid, {}).get("titel", cid),
                 "document_naam": doc["naam"],

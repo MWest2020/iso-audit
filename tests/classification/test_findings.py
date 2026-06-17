@@ -265,10 +265,22 @@ def test_gedaan_per_doc(db_pad: str) -> None:
         "document_naam, classified_at) VALUES (?,?,?,?,?,?,datetime('now'))",
         ("d1", "Drive", "8.16", "9001", "NC", "Doc1"),
     )
+    # Jira deelt het document-pad → moet meetellen in de dedup.
+    conn.execute(
+        "INSERT INTO bevindingen (doc_id, herkomst, clausule_id, norm, classificatie, "
+        "document_naam, classified_at) VALUES (?,?,?,?,?,?,datetime('now'))",
+        ("AUD-7", "Jira", "5.30", "9001", "NC", "AUD-7"),
+    )
+    # Miro heeft een eigen pad → mag NIET in deze dedup verschijnen.
+    conn.execute(
+        "INSERT INTO bevindingen (doc_id, herkomst, clausule_id, norm, classificatie, "
+        "document_naam, classified_at) VALUES (?,?,?,?,?,?,datetime('now'))",
+        ("m1", "Miro", "10.2", "9001", "OFI", "Sticky1"),
+    )
     conn.commit()
     result = findings._gedaan_per_doc(conn, "9001")
     conn.close()
-    assert result == {"d1": {"10.2", "8.16"}}
+    assert result == {"d1": {"10.2", "8.16"}, "AUD-7": {"5.30"}}
 
 
 def test_gedaan_miro(db_pad: str) -> None:

@@ -291,9 +291,12 @@ def run_audit(
         geaccepteerd — equivalent aan AutonoomMode zonder DB-persistentie.
     :param audit_id: Run-scope identifier voor `decisions`/`classifications`.
         Bij `None` wordt er een gegenereerd.
-    :param sources: De `--source`-lijst van de CLI; alleen gebruikt voor
-        de `ingest_scope`-Decision-context (auditor kan zien welke
-        bronnen actief zijn).
+    :param sources: De geselecteerde bronnen voor deze run (default
+        `["drive", "miro"]`). Bepaalt zowel de `ingest_scope`-Decision-context
+        als de feitelijke ingest: Drive en Miro hebben hun eigen pad; elke
+        andere geselecteerde bron (Jira, Planning, …) wordt via het
+        `Source`-Protocol ingelezen (`ingest_documenten`). Een bron die niet
+        geselecteerd is, wordt niet ingelezen.
     """
     audit_id = audit_id or _maak_audit_id()
     _resume_pending_decisions(audit_id, mode)
@@ -312,7 +315,6 @@ def run_audit(
     from iso_audit.miro.ingest import (
         haal_notities_op,
         koppel_aan_clausules,
-        merge_met_drive_bevindingen,
     )
     from iso_audit.notification import (
         stuur_calendar_uitnodiging,
@@ -327,6 +329,7 @@ def run_audit(
     from iso_audit.reporting.slide_summary import genereer_slides
     from iso_audit.reporting.tabular_report import schrijf_csv, schrijf_excel
     from iso_audit.sources.drive import haal_documenten_op
+    from iso_audit.sources.protocol_ingest import ingest_documenten
 
     logger.info(
         "=== ISO Audit Pipeline gestart (norm: %s, rehash: %s, dry-run-cost: %s) ===",
@@ -341,14 +344,15 @@ def run_audit(
         clause_map = filter_clause_map(clause_map, chapter)
         logger.info("Hoofdstuk-filter actief: alleen clausule %s.*", chapter)
 
-    logger.info("Stap 2/7: Drive-documenten inlezen...")
+    actieve_bronnen = [s.lower() for s in (sources or ["drive", "miro"])]
+    logger.info("Stap 2/7: Documenten inlezen (bronnen: %s)...", ", ".join(actieve_bronnen))
     _emit_decision(
         mode,
         punt="ingest_scope",
-        voorstel={"sources": sources or ["drive", "miro"], "norm": norm},
+        voorstel={"sources": actieve_bronnen, "norm": norm},
         risico="laag",
         context={
-            "sources": sources or ["drive", "miro"],
+            "sources": actieve_bronnen,
             "norm": norm,
             "chapter": chapter,
             # Auditor kan bij integer-modus expliciet om bevestiging vragen:
@@ -356,24 +360,39 @@ def run_audit(
         },
         audit_id=audit_id,
     )
-    documenten, handmatige_review = haal_documenten_op()
-    if handmatige_review:
-        logger.warning(
-            "%d bestand(en) vereisen handmatige review: %s",
-            len(handmatige_review),
-            [h["naam"] for h in handmatige_review],
-        )
+    documenten: list[dict[str, Any]] = []
+    handmatige_review: list[dict[str, Any]] = []
+    if "drive" in actieve_bronnen:
+        documenten, handmatige_review = haal_documenten_op()
+        if handmatige_review:
+            logger.warning(
+                "%d bestand(en) vereisen handmatige review: %s",
+                len(handmatige_review),
+                [h["naam"] for h in handmatige_review],
+            )
+
+    # Overige document-bronnen (Jira, Planning, …) via het Source-Protocol.
+    # Miro heeft een eigen notitie-pad (stap 3) en valt hierbuiten.
+    for bron in actieve_bronnen:
+        if bron in ("drive", "miro"):
+            continue
+        try:
+            extra = ingest_documenten(bron)
+            documenten.extend(extra)
+        except Exception as e:
+            logger.warning("Bron %s overgeslagen (ingest-fout, niet kritiek): %s", bron, e)
 
     logger.info("Stap 3/7: Miro-notities inlezen...")
     miro_notities: list[dict[str, Any]] = []
-    try:
-        miro_notities_raw = haal_notities_op()
-        miro_notities = koppel_aan_clausules(miro_notities_raw, clause_map)
-        logger.info("%d Miro-notities ingelezen", len(miro_notities))
-    except OSError as e:
-        logger.warning("Miro overgeslagen: %s", e)
-    except Exception as e:
-        logger.warning("Miro-ingest mislukt (niet kritiek): %s", e)
+    if "miro" in actieve_bronnen:
+        try:
+            miro_notities_raw = haal_notities_op()
+            miro_notities = koppel_aan_clausules(miro_notities_raw, clause_map)
+            logger.info("%d Miro-notities ingelezen", len(miro_notities))
+        except OSError as e:
+            logger.warning("Miro overgeslagen: %s", e)
+        except Exception as e:
+            logger.warning("Miro-ingest mislukt (niet kritiek): %s", e)
 
     logger.info("Stap 4/7: Documenten koppelen aan clausules...")
     cutoff = (date.today() - timedelta(days=2 * 365)).isoformat()
@@ -387,9 +406,6 @@ def run_audit(
         len(gearchiveerd),
     )
 
-    _alle_input = merge_met_drive_bevindingen(
-        miro_notities, [{**doc, "herkomst": "Drive"} for doc in gekoppeld]
-    )
     ontbrekend = ontbrekende_dekking(gekoppeld, miro_notities, clause_map)
 
     if niet_geclassificeerd:

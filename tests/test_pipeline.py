@@ -197,3 +197,54 @@ def test_converteer_md_html_ok_dan_docx_pdf() -> None:
         patch("iso_audit.reporting.html_to_pdf.converteer", return_value="/tmp/x.pdf"),
     ):
         pipeline._converteer_md_naar_html_docx_pdf("/tmp/x.md")
+
+
+# ---------- run_audit honoreert de geselecteerde bronnen ----------
+
+
+def _jira_doc() -> dict[str, Any]:
+    return {
+        "naam": "AUD-1",
+        "id": "AUD-1",
+        "tekst": "backup beleid en directie review",
+        "herkomst": "Jira",
+        "mime_type": "issue",
+        "modified_at": "2026-05-01T10:00:00Z",
+    }
+
+
+def test_run_audit_jira_zonder_drive_skipt_drive() -> None:
+    """sources=['jira'] → Drive/Miro overgeslagen, Jira via protocol-ingest."""
+    from unittest.mock import MagicMock
+
+    drive = MagicMock(return_value=([], []))
+    jira = MagicMock(return_value=[_jira_doc()])
+    with (
+        patch("iso_audit.sources.drive.haal_documenten_op", drive),
+        patch("iso_audit.sources.protocol_ingest.ingest_documenten", jira),
+        patch("iso_audit.miro.ingest.haal_notities_op") as miro,
+        patch("iso_audit.classification.findings.schat_kosten", return_value={}),
+    ):
+        # dry_run_cost stopt vóór LLM-classificatie en rapportage.
+        pipeline.run_audit("9001", dry_run_cost=True, sources=["jira"])
+    drive.assert_not_called()
+    jira.assert_called_once_with("jira")
+    miro.assert_not_called()
+
+
+def test_run_audit_default_bronnen_drive_en_miro() -> None:
+    """sources=None → default Drive + Miro; geen protocol-ingest."""
+    from unittest.mock import MagicMock
+
+    drive = MagicMock(return_value=([], []))
+    protocol = MagicMock(return_value=[])
+    with (
+        patch("iso_audit.sources.drive.haal_documenten_op", drive),
+        patch("iso_audit.sources.protocol_ingest.ingest_documenten", protocol),
+        patch("iso_audit.miro.ingest.haal_notities_op", return_value=[]) as miro,
+        patch("iso_audit.classification.findings.schat_kosten", return_value={}),
+    ):
+        pipeline.run_audit("9001", dry_run_cost=True, sources=None)
+    drive.assert_called_once()
+    miro.assert_called_once()
+    protocol.assert_not_called()  # drive+miro hebben eigen pad

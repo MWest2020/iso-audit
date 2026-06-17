@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-06-17 — connector-engine: run_audit leest élke geselecteerde bron in
+
+De kern van de connectoren-fase. Tot nu had `run_audit` de ingest hardcoded op
+Drive + Miro; de `sources`-lijst voedde alleen de `ingest_scope`-Decision. Nu
+bepaalt `sources` de feitelijke ingest — een gekoppelde Jira (of Planning, en
+straks GitHub/Codeberg) levert echt bevindingen op.
+
+- **`sources/protocol_ingest.py`** (nieuw): `ingest_documenten(naam)` mapt elk
+  `Document` (+ `fetch_content`) van een geregistreerde Source-adapter naar de
+  pipeline-document-dict (`naam`/`id`/`mime_type`/`tekst`/`herkomst`/
+  `modified_at`). `herkomst` = bronnaam met hoofdletter. Leesfouten op één
+  document zijn niet fataal (gelogd + overgeslagen).
+- **`pipeline.run_audit`**: ingest honoreert nu `sources`. Drive en Miro houden
+  hun eigen pad maar worden overgeslagen als ze niet geselecteerd zijn; elke
+  andere geselecteerde bron loopt via `ingest_documenten` en wordt aan de
+  document-stroom toegevoegd (en zo gekoppeld + geclassificeerd). Dode
+  `_alle_input`-regel + ongebruikte `merge_met_drive_bevindingen`-import
+  verwijderd.
+- **`classification/findings.py`**: bevindingen krijgen nu de **eigen herkomst**
+  van het document (Drive/Jira/Planning) i.p.v. hardcoded `"Drive"`; de dedup
+  (`_gedaan_per_doc`) dekt alle niet-Miro-bronnen (`herkomst != 'Miro'`), zodat
+  Jira/Planning óók correct gededupliceerd worden over re-runs. Classifications-
+  log-`finding_id` gebruikt de echte herkomst-prefix.
+- **Tests**: `ingest_documenten`-unit (mapping + skip-on-error + onbekende bron),
+  `run_audit`-gating (Jira zonder Drive; default = Drive+Miro) via `dry_run_cost`,
+  uitgebreide `_gedaan_per_doc` (Jira meegeteld, Miro uitgesloten). 747 tests
+  groen; ruff/format/mypy/bandit clean.
+
 ### Changed — 2026-06-17 — Jira: JIRA_USER_EMAIL + project-scoping; planning sheet-id-validatie
 
 - **`JiraSource`** (`sources/jira.py`): leest nu `JIRA_USER_EMAIL` (gekozen naam),
