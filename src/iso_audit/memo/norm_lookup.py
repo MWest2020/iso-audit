@@ -55,6 +55,11 @@ class NormDatabase:
     def standards(self) -> list[str]:
         return sorted(self._db)
 
+    def has_clause(self, standard: str, clause: str) -> bool:
+        """Bevat deze norm-DB de clausule? (voor standaard-resolutie bij beide-runs)."""
+        norm = self._db.get(standard)
+        return bool(norm and clause in norm["clauses"])
+
     def citation(self, standard: str, clause: str, language: str) -> ClauseCitation:
         """Geef het citaat voor (standard, clause) in ``language``; hard-fail bij ontbreken."""
         norm = self._db.get(standard)

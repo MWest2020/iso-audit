@@ -30,7 +30,23 @@ class _ProgressHandler(logging.Handler):
         self._sink(record.getMessage())
 
 
-def export_db_findings(*, norm: str = "9001") -> list[Finding]:
+def _resolve_standard(row_norm: str, clause: str, db: object | None) -> str:
+    """Bepaal de norm-DB-slug per finding. Bij norm='beide' via clausule-membership.
+
+    Clausule-ID's botsen tussen 9001 en 27001 (bv. §6.2); de DB slaat 'beide' op
+    zonder per-finding norm. We resolven dan: alleen in 27001 → 27001; anders
+    (alleen 9001, of botsing in beide) → 9001 (default).
+    """
+    if row_norm in _NORM_SLUG:
+        return _NORM_SLUG[row_norm]
+    if db is not None and db.has_clause("iso-27001-2022", clause) and not db.has_clause(  # type: ignore[attr-defined]
+        "iso-9001-2015", clause
+    ):
+        return "iso-27001-2022"
+    return "iso-9001-2015"
+
+
+def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> list[Finding]:
     """Lees de bevindingen uit de audit-DB en map ze naar het memo-Finding-model."""
     import sqlite3
 
@@ -38,6 +54,7 @@ def export_db_findings(*, norm: str = "9001") -> list[Finding]:
     from iso_audit.store import verbinding
 
     titels = laad_clause_map(norm).get("clausules", {})
+    db = laad_norm_db(norms_dir) if norms_dir else None
     conn = verbinding()
     conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT * FROM bevindingen ORDER BY clausule_id").fetchall()
@@ -50,7 +67,7 @@ def export_db_findings(*, norm: str = "9001") -> list[Finding]:
             Finding(
                 id=str(r["id"]),
                 severity=_SEV.get(r["classificatie"], "UNCLASSIFIED"),  # type: ignore[arg-type]
-                standard=_NORM_SLUG.get(r["norm"], "iso-9001-2015"),
+                standard=_resolve_standard(r["norm"], clausule, db),
                 clause=clausule,
                 title=f"NC clausule {clausule} — {titel} [{(r['document_naam'] or '?')[:50]}]",
                 description=r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)",
@@ -95,6 +112,6 @@ def run_live_pipeline(
 
 def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> list[Finding]:
     """Exporteer DB-findings en draaf de kop-NC's (na een live run)."""
-    ruw = export_db_findings(norm=norm)
+    ruw = export_db_findings(norm=norm, norms_dir=norms_dir)
     norm_db = laad_norm_db(norms_dir)
     return draft_findings(ruw, norm_db=norm_db, language=language, top_n=top_n)
