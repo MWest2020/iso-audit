@@ -1,13 +1,13 @@
 {
-  "role": "builder",
+  "role": "reviewer",
   "change": "apply-docs-contract",
-  "run_id": "builder-apply-docs-contract-20260713-072017",
+  "run_id": "reviewer-apply-docs-contract-20260713-073217",
   "repo": "https://github.com/MWest2020/iso-audit.git",
   "verdict": "ok",
   "subtype": "success",
-  "total_cost_usd": "3.828884999999999",
-  "num_turns": "65",
+  "total_cost_usd": "0.653665",
+  "num_turns": "8",
   "claude_exit": "0",
-  "finished_at": "2026-07-13T07:31:47Z",
-  "diff_hash": "1083049cd1135bdd06c21c0c8b34130204a64a8e700b5779bb42e08b3458b654"
+  "finished_at": "2026-07-13T07:34:53Z",
+  "diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 }
