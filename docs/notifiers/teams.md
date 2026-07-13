@@ -1,19 +1,12 @@
-# Notifier: Teams
+---
+status: deprecated
+last_reviewed: 2026-07-13
+---
 
-> **Status:** placeholder. Implementatie via eigen change-proposal
-> `iso-audit-teams-notifier` wanneer de eerste afnemer (typisch
-> gemeentelijke organisatie) erom vraagt.
+# Verplaatst → `docs/reference/notifier-teams.md`
 
-Microsoft Teams als handoff-kanaal voor integer-modus. Adaptive
-Cards-equivalent van Slack Block Kit.
-
-## TODO
-
-- Adapter implementeert `Notifier` Protocol via Microsoft Graph API
-- Adaptive Cards met action-buttons
-- Webhook voor inbound action-callbacks
-- Authenticatie via Azure AD app-registration
-- Mapping naar `(decision_id, action, modified_payload)` voor de
-  DecisionResolver — dezelfde shape als Slack
-
-Wachten op concrete vraag-vanuit-praktijk.
+Deze pagina is verplaatst naar
+[`../reference/notifier-teams.md`](../reference/notifier-teams.md) als
+onderdeel van de handbook docs-contract-migratie (change
+`apply-docs-contract`). Werk je links bij; deze stub blijft alleen staan
+zodat bestaande inbound links blijven werken.

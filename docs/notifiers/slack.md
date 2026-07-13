@@ -1,40 +1,12 @@
-# Notifier: Slack
+---
+status: deprecated
+last_reviewed: 2026-07-13
+---
 
-> **Status:** spec klaar; implementatie in milestone C.
+# Verplaatst → `docs/reference/notifier-slack.md`
 
-Slack als handoff-kanaal voor integer-modus. Block Kit-messages met
-action-buttons (`Goedkeuren`, `Afwijzen`, `Aanpassen`, `Afbreken`).
-
-## Configuratie
-
-| Env-var | Verplicht | Beschrijving |
-|---|---|---|
-| `SLACK_BOT_TOKEN` | ja | OAuth-token van een Slack-app (`xoxb-…`) |
-| `SLACK_AUDIT_CHANNEL` | ja | Channel-ID waar handoff-messages heen gaan |
-| `SLACK_SIGNING_SECRET` | ja | Voor verificatie van button-callbacks via Events API |
-
-## Slack-app setup
-
-Eenmalig per workspace:
-
-1. Maak een Slack-app via `api.slack.com/apps`
-2. OAuth & Permissions → Bot Token Scopes:
-   - `chat:write` (verzenden)
-   - `channels:read` (channel resolve)
-3. Interactivity & Shortcuts → enable, request-URL =
-   `https://<jouw-host>/iso-audit/slack/interact` (handler die in
-   milestone C wordt geïmplementeerd)
-4. Install to Workspace; bewaar `SLACK_BOT_TOKEN` (begint met `xoxb-`)
-5. Invite de bot in `#iso-audit-handoffs` (of welke channel je wilt)
-
-## Audit-trail
-
-Outbound Block Kit-messages én inbound button-payloads worden gelogd in
-het pipeline-log. `decisions.notifier_naam = "slack"` voor cross-channel-
-analyse later.
-
-## Aanroep
-
-```bash
-iso-audit pipeline --source jira --source drive --mode integer --notifier slack
-```
+Deze pagina is verplaatst naar
+[`../reference/notifier-slack.md`](../reference/notifier-slack.md) als
+onderdeel van de handbook docs-contract-migratie (change
+`apply-docs-contract`). Werk je links bij; deze stub blijft alleen staan
+zodat bestaande inbound links blijven werken.

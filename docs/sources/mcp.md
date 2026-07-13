@@ -1,24 +1,12 @@
-# Source: MCP
+---
+status: deprecated
+last_reviewed: 2026-07-13
+---
 
-> **Status:** placeholder. Implementatie via eigen change-proposal
-> `iso-audit-mcp-source` na milestone C.
+# Verplaatst → `docs/reference/source-mcp.md`
 
-Generieke Model Context Protocol-adapter zodat iso-audit elk
-MCP-server-aangeboden bron kan consumeren (Asana, Linear, Notion,
-Confluence, GitHub, …) zonder per-bron een eigen Source-implementatie.
-
-## Naamgeving
-
-Adapters geregistreerd onder `mcp:<server-naam>`, e.g. `mcp:asana`,
-`mcp:notion`. De dubbele-punt-conventie is parallel aan hoe MCP-tool-IDs
-zelf werken.
-
-## TODO
-
-- Adapter generaliseert MCP-tool-calls naar `Source.list_documents` /
-  `list_findings`
-- Configuratie via `MCP_<SERVER>_*` env-vars
-- Open vraag: hoe mapt MCP-tool-call-respons op `Document` versus `Finding`?
-  Sommige MCP-servers leveren beide door elkaar.
-
-Wachten op concrete vraag-vanuit-praktijk voordat dit gebouwd wordt.
+Deze pagina is verplaatst naar
+[`../reference/source-mcp.md`](../reference/source-mcp.md) als onderdeel
+van de handbook docs-contract-migratie (change `apply-docs-contract`). Werk
+je links bij; deze stub blijft alleen staan zodat bestaande inbound links
+blijven werken.
